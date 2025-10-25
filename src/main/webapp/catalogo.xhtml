@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://xmlns.jcp.org/jsf/html"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:f="http://xmlns.jcp.org/jsf/core">
+
+<h:head>
+    <title>Catálogo Multimedia</title>
+</h:head>
+
+<h:body>
+    <h:form id="catalogoForm">
+        <p:growl id="messages" showDetail="true"/>
+
+        <div class="card">
+            <h2>Catálogo de Películas y Series</h2>
+
+            <!-- Barra de herramientas -->
+            <p:toolbar>
+                <p:toolbarGroup>
+                    <p:commandButton value="Nuevo Título"
+                                     icon="pi pi-plus"
+                                     action="#{mediaTitleBean.prepareNewTitle}"
+                                     oncomplete="PF('dialogNew').show()"
+                                     update=":newTitleForm"
+                                     styleClass="p-button-success"/>
+
+                    <p:button value="Dashboard"
+                              outcome="dashboard"
+                              icon="pi pi-chart-bar"
+                              styleClass="p-button-info"/>
+                </p:toolbarGroup>
+            </p:toolbar>
+
+            <!-- Panel de filtros -->
+            <p:panel header="Filtros de Búsqueda" toggleable="true" collapsed="true" style="margin-top: 20px;">
+                <div class="p-grid p-fluid">
+                    <div class="p-col-12 p-md-3">
+                        <h:outputLabel for="searchName" value="Nombre:"/>
+                        <p:inputText id="searchName" value="#{mediaTitleBean.searchTitleName}"/>
+                    </div>
+
+                    <div class="p-col-12 p-md-3">
+                        <h:outputLabel for="searchType" value="Tipo:"/>
+                        <p:selectOneMenu id="searchType" value="#{mediaTitleBean.searchType}">
+                            <f:selectItem itemLabel="Todos" itemValue="#{null}"/>
+                            <f:selectItems value="#{mediaTitleBean.titleTypes}"
+                                           var="type"
+                                           itemLabel="#{type.displayName}"
+                                           itemValue="#{type}"/>
+                        </p:selectOneMenu>
+                    </div>
+
+                    <div class="p-col-12 p-md-2">
+                        <h:outputLabel for="searchYear" value="Año:"/>
+                        <p:inputNumber id="searchYear" value="#{mediaTitleBean.searchYear}" decimalPlaces="0"/>
+                    </div>
+
+                    <div class="p-col-12 p-md-2">
+                        <h:outputLabel for="searchGenre" value="Género:"/>
+                        <p:selectOneMenu id="searchGenre" value="#{mediaTitleBean.searchGenreId}">
+                            <f:selectItem itemLabel="Todos" itemValue="#{null}"/>
+                            <f:selectItems value="#{mediaTitleBean.availableGenres}"
+                                           var="genre"
+                                           itemLabel="#{genre.genreName}"
+                                           itemValue="#{genre.movieGenreId}"/>
+                        </p:selectOneMenu>
+                    </div>
+
+                    <div class="p-col-12 p-md-2">
+                        <h:outputLabel value=" "/>
+                        <div>
+                            <p:commandButton value="Buscar"
+                                             icon="pi pi-search"
+                                             action="#{mediaTitleBean.searchTitles}"
+                                             update="catalogoTable"
+                                             styleClass="p-button-primary"/>
+                            <p:commandButton value="Limpiar"
+                                             icon="pi pi-times"
+                                             action="#{mediaTitleBean.clearSearch}"
+                                             update="catalogoTable,catalogoForm"
+                                             styleClass="p-button-secondary"
+                                             style="margin-left: 5px;"/>
+                        </div>
+                    </div>
+                </div>
+            </p:panel>
+
+            <!-- Tabla de títulos -->
+            <p:dataTable id="catalogoTable"
+                         value="#{mediaTitleBean.mediaTitles}"
+                         var="title"
+                         filteredValue="#{mediaTitleBean.filteredTitles}"
+                         paginator="true"
+                         rows="10"
+                         paginatorTemplate="{CurrentPageReport} {FirstPageLink} {PreviousPageLink} {PageLinks} {NextPageLink} {LastPageLink} {RowsPerPageDropdown}"
+                         rowsPerPageTemplate="5,10,15"
+                         emptyMessage="No se encontraron títulos"
+                         style="margin-top: 20px;">
+
+                <p:column headerText="Póster" style="width: 100px; text-align: center;">
+                    <p:graphicImage value="#{title.hasPoster() ? 'poster-placeholder.png' : 'no-poster.png'}"
+                                    width="80"
+                                    height="120"
+                                    alt="#{title.titleName}"
+                                    title="#{title.titleName}"/>
+                    <br/>
+                    <p:badge value="Sin póster" severity="warning" rendered="#{not title.hasPoster()}"/>
+                </p:column>
+
+                <p:column headerText="Título" sortBy="#{title.titleName}" filterBy="#{title.titleName}">
+                    <h:outputText value="#{title.titleName}" style="font-weight: bold;"/>
+                </p:column>
+
+                <p:column headerText="Tipo" sortBy="#{title.titleType}" style="width: 100px;">
+                    <p:badge value="#{title.titleType.displayName}"
+                             severity="#{title.titleType == 'MOVIE' ? 'success' : 'info'}"/>
+                </p:column>
+
+                <p:column headerText="Año" sortBy="#{title.releaseYear}" style="width: 80px;">
+                    <h:outputText value="#{title.releaseYear}"/>
+                </p:column>
+
+                <p:column headerText="Géneros" style="width: 200px;">
+                    <p:repeat value="#{title.genres}" var="genre">
+                        <p:badge value="#{genre.genreName}" severity="secondary" style="margin: 2px;"/>
+                    </p:repeat>
+                </p:column>
+
+                <p:column headerText="Calificación" sortBy="#{title.averageRating}" style="width: 100px;">
+                    <h:outputText value="#{title.averageRating}">
+                        <f:convertNumber pattern="#0.0"/>
+                    </h:outputText>
+                    <i class="pi pi-star-fill" style="color: #FCD34D; margin-left: 5px;"></i>
+                </p:column>
+
+                <p:column headerText="Acciones" style="width: 250px; text-align: center;">
+                    <p:commandButton icon="pi pi-pencil"
+                                     title="Editar"
+                                     action="#{mediaTitleBean.prepareEdit(title)}"
+                                     oncomplete="PF('dialogEdit').show()"
+                                     update=":editTitleForm"
+                                     styleClass="p-button-warning p-button-sm"/>
+
+                    <p:commandButton icon="pi pi-image"
+                                     title="Subir Póster"
+                                     action="#{mediaTitleBean.setSelectedTitle(title)}"
+                                     oncomplete="PF('dialogPoster').show()"
+                                     update=":posterForm"
+                                     styleClass="p-button-info p-button-sm"
+                                     style="margin-left: 5px;"/>
+
+                    <p:commandButton icon="pi pi-file-pdf"
+                                     title="Subir Ficha Técnica"
+                                     action="#{mediaTitleBean.setSelectedTitle(title)}"
+                                     oncomplete="PF('dialogTechnical').show()"
+                                     update=":technicalForm"
+                                     styleClass="p-button-help p-button-sm"
+                                     style="margin-left: 5px;"/>
+
+                    <p:commandButton icon="pi pi-trash"
+                                     title="Eliminar"
+                                     action="#{mediaTitleBean.deleteTitle(title.mediaTitleId)}"
+                                     update="catalogoTable"
+                                     styleClass="p-button-danger p-button-sm"
+                                     style="margin-left: 5px;">
+                        <p:confirm header="Confirmación"
+                                   message="¿Está seguro de eliminar este título?"
+                                   icon="pi pi-exclamation-triangle"/>
+                    </p:commandButton>
+                </p:column>
+            </p:dataTable>
+        </div>
+
+        <p:confirmDialog global="true" showEffect="fade" hideEffect="fade">
+            <p:commandButton value="Sí" type="button" styleClass="ui-confirmdialog-yes" icon="pi pi-check"/>
+            <p:commandButton value="No" type="button" styleClass="ui-confirmdialog-no" icon="pi pi-times"/>
+        </p:confirmDialog>
+    </h:form>
+
+    <!-- Diálogo: Nuevo Título -->
+    <p:dialog id="dialogNew" widgetVar="dialogNew" header="Nuevo Título" modal="true" width="600">
+        <h:form id="newTitleForm">
+            <p:messages id="newMessages"/>
+
+            <div class="p-fluid">
+                <div class="p-field">
+                    <p:outputLabel for="titleName" value="Nombre:"/>
+                    <p:inputText id="titleName" value="#{mediaTitleBean.newTitle.titleName}" required="true"/>
+                </div>
+
+                <div class="p-field">
+                    <p:outputLabel for="titleType" value="Tipo:"/>
+                    <p:selectOneMenu id="titleType" value="#{mediaTitleBean.newTitle.titleType}" required="true">
+                        <f:selectItem itemLabel="Seleccione..." itemValue="#{null}"/>
+                        <f:selectItems value="#{mediaTitleBean.titleTypes}"
+                                       var="type"
+                                       itemLabel="#{type.displayName}"
+                                       itemValue="#{type}"/>
+                    </p:selectOneMenu>
+                </div>
+
+                <div class="p-field">
+                    <p:outputLabel for="releaseYear" value="Año de lanzamiento:"/>
+                    <p:inputNumber id="releaseYear"
+                                   value="#{mediaTitleBean.newTitle.releaseYear}"
+                                   decimalPlaces="0"
+                                   required="true"/>
+                </div>
+
+                <div class="p-field">
+                    <p:outputLabel for="genres" value="Géneros:"/>
+                    <p:selectCheckboxMenu id="genres"
+                                          value="#{mediaTitleBean.selectedGenreIds}"
+                                          label="Seleccione géneros"
+                                          filter="true"
+                                          filterMatchMode="contains"
+                                          panelStyle="width:250px">
+                        <f:selectItems value="#{mediaTitleBean.availableGenres}"
+                                       var="genre"
+                                       itemLabel="#{genre.genreName}"
+                                       itemValue="#{genre.movieGenreId}"/>
+                    </p:selectCheckboxMenu>
+                </div>
+
+                <div class="p-field">
+                    <p:outputLabel for="synopsis" value="Sinopsis:"/>
+                    <p:inputTextarea id="synopsis"
+                                     value="#{mediaTitleBean.newTitle.synopsis}"
+                                     rows="4"
+                                     maxlength="1000"
+                                     counter="synopsisCounter"
+                                     counterTemplate="{0} caracteres restantes"/>
+                    <h:outputText id="synopsisCounter"/>
+                </div>
+
+                <div class="p-field">
+                    <p:outputLabel for="rating" value="Calificación (0-10):"/>
+                    <p:inputNumber id="rating"
+                                   value="#{mediaTitleBean.newTitle.averageRating}"
+                                   minValue="0"
+                                   maxValue="10"
+                                   decimalPlaces="1"/>
+                </div>
+            </div>
+
+            <p:commandButton value="Guardar"
+                             icon="pi pi-save"
+                             action="#{mediaTitleBean.saveTitle}"
+                             update=":catalogoForm:catalogoTable,:catalogoForm:messages,newMessages"
+                             oncomplete="if (args &amp;&amp; !args.validationFailed) PF('dialogNew').hide()"
+                             styleClass="p-button-success"/>
+
+            <p:commandButton value="Cancelar"
+                             icon="pi pi-times"
+                             onclick="PF('dialogNew').hide()"
+                             styleClass="p-button-secondary"
+                             type="button"
+                             style="margin-left: 10px;"/>
+        </h:form>
+    </p:dialog>
+
+    <!-- Diálogo: Editar Título -->
+    <p:dialog id="dialogEdit" widgetVar="dialogEdit" header="Editar Título" modal="true" width="600">
+        <h:form id="editTitleForm">
+            <p:messages id="editMessages"/>
+
+            <div class="p-fluid">
+                <div class="p-field">
+                    <p:outputLabel for="editTitleName" value="Nombre:"/>
+                    <p:inputText id="editTitleName" value="#{mediaTitleBean.selectedTitle.titleName}" required="true"/>
+                </div>
+
+                <div class="p-field">
+                    <p:outputLabel for="editTitleType" value="Tipo:"/>
+                    <p:selectOneMenu id="editTitleType" value="#{mediaTitleBean.selectedTitle.titleType}" required="true">
+                        <f:selectItems value="#{mediaTitleBean.titleTypes}"
+                                       var="type"
+                                       itemLabel="#{type.displayName}"
+                                       itemValue="#{type}"/>
+                    </p:selectOneMenu>
+                </div>
+
+                <div class="p-field">
+                    <p:outputLabel for="editReleaseYear" value="Año de lanzamiento:"/>
+                    <p:inputNumber id="editReleaseYear"
+                                   value="#{mediaTitleBean.selectedTitle.releaseYear}"
+                                   decimalPlaces="0"
+                                   required="true"/>
+                </div>
+
+                <div class="p-field">
+                    <p:outputLabel for="editGenres" value="Géneros:"/>
+                    <p:selectCheckboxMenu id="editGenres"
+                                          value="#{mediaTitleBean.selectedGenreIds}"
+                                          label="Seleccione géneros"
+                                          filter="true"
+                                          filterMatchMode="contains"
+                                          panelStyle="width:250px">
+                        <f:selectItems value="#{mediaTitleBean.availableGenres}"
+                                       var="genre"
+                                       itemLabel="#{genre.genreName}"
+                                       itemValue="#{genre.movieGenreId}"/>
+                    </p:selectCheckboxMenu>
+                </div>
+
+                <div class="p-field">
+                    <p:outputLabel for="editSynopsis" value="Sinopsis:"/>
+                    <p:inputTextarea id="editSynopsis"
+                                     value="#{mediaTitleBean.selectedTitle.synopsis}"
+                                     rows="4"
+                                     maxlength="1000"
+                                     counter="editSynopsisCounter"
+                                     counterTemplate="{0} caracteres restantes"/>
+                    <h:outputText id="editSynopsisCounter"/>
+                </div>
+
+                <div class="p-field">
+                    <p:outputLabel for="editRating" value="Calificación (0-10):"/>
+                    <p:inputNumber id="editRating"
+                                   value="#{mediaTitleBean.selectedTitle.averageRating}"
+                                   minValue="0"
+                                   maxValue="10"
+                                   decimalPlaces="1"/>
+                </div>
+            </div>
+
+            <p:commandButton value="Actualizar"
+                             icon="pi pi-save"
+                             action="#{mediaTitleBean.updateTitle}"
+                             update=":catalogoForm:catalogoTable,:catalogoForm:messages,editMessages"
+                             oncomplete="if (args &amp;&amp; !args.validationFailed) PF('dialogEdit').hide()"
+                             styleClass="p-button-success"/>
+
+            <p:commandButton value="Cancelar"
+                             icon="pi pi-times"
+                             onclick="PF('dialogEdit').hide()"
+                             styleClass="p-button-secondary"
+                             type="button"
+                             style="margin-left: 10px;"/>
+        </h:form>
+    </p:dialog>
+
+    <!-- Diálogo: Subir Póster -->
+    <p:dialog id="dialogPoster" widgetVar="dialogPoster" header="Subir Póster" modal="true" width="500">
+        <h:form id="posterForm" enctype="multipart/form-data">
+            <p:messages id="posterMessages"/>
+
+            <p:outputPanel rendered="#{mediaTitleBean.selectedTitle != null}">
+                <h4>Título: #{mediaTitleBean.selectedTitle.titleName}</h4>
+
+                <p:fileUpload mode="advanced"
+                              listener="#{mediaTitleBean.handlePosterUpload}"
+                              update=":catalogoForm:catalogoTable,:catalogoForm:messages,posterMessages"
+                              auto="false"
+                              multiple="false"
+                              allowTypes="/(\.|\/)(jpg|jpeg|png)$/"
+                              sizeLimit="2097152"
+                              label="Seleccionar"
+                              uploadLabel="Subir"
+                              cancelLabel="Cancelar"
+                              invalidSizeMessage="El archivo excede el tamaño máximo de 2 MB"
+                              invalidFileMessage="Solo se permiten archivos JPG y PNG"/>
+
+                <p style="color: #6B7280; font-size: 14px; margin-top: 10px;">
+                    * Formatos permitidos: JPG, PNG<br/>
+                    * Tamaño máximo: 2 MB
+                </p>
+            </p:outputPanel>
+
+            <p:commandButton value="Cerrar"
+                             icon="pi pi-times"
+                             onclick="PF('dialogPoster').hide()"
+                             styleClass="p-button-secondary"
+                             type="button"
+                             style="margin-top: 10px;"/>
+        </h:form>
+    </p:dialog>
+
+    <!-- Diálogo: Subir Ficha Técnica -->
+    <p:dialog id="dialogTechnical" widgetVar="dialogTechnical" header="Subir Ficha Técnica" modal="true" width="500">
+        <h:form id="technicalForm" enctype="multipart/form-data">
+            <p:messages id="technicalMessages"/>
+
+            <p:outputPanel rendered="#{mediaTitleBean.selectedTitle != null}">
+                <h4>Título: #{mediaTitleBean.selectedTitle.titleName}</h4>
+
+                <p:fileUpload mode="advanced"
+                              listener="#{mediaTitleBean.handleTechnicalSheetUpload}"
+                              update=":catalogoForm:messages,technicalMessages"
+                              auto="false"
+                              multiple="false"
+                              allowTypes="/(\.|\/)(pdf)$/"
+                              sizeLimit="5242880"
+                              label="Seleccionar"
+                              uploadLabel="Subir"
+                              cancelLabel="Cancelar"
+                              invalidSizeMessage="El archivo excede el tamaño máximo de 5 MB"
+                              invalidFileMessage="Solo se permiten archivos PDF"/>
+
+                <p style="color: #6B7280; font-size: 14px; margin-top: 10px;">
+                    * Formato permitido: PDF<br/>
+                    * Tamaño máximo: 5 MB
+                </p>
+            </p:outputPanel>
+
+            <p:commandButton value="Cerrar"
+                             icon="pi pi-times"
+                             onclick="PF('dialogTechnical').hide()"
+                             styleClass="p-button-secondary"
+                             type="button"
+                             style="margin-top: 10px;"/>
+        </h:form>
+    </p:dialog>
+</h:body>
+</html>

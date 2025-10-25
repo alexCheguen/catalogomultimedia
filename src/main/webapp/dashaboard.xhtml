@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://xmlns.jcp.org/jsf/html"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:f="http://xmlns.jcp.org/jsf/core">
+
+<h:head>
+    <title>Dashboard - Catálogo Multimedia</title>
+    <h:outputStylesheet library="css" name="custom.css"/>
+</h:head>
+
+<h:body>
+    <h:form id="dashboardForm">
+        <p:growl id="messages" showDetail="true"/>
+
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Dashboard - Estadísticas del Catálogo</h2>
+                <p:commandButton value="Actualizar"
+                                 icon="pi pi-refresh"
+                                 action="#{dashboardBean.refresh}"
+                                 update="dashboardForm"
+                                 styleClass="p-button-secondary"/>
+            </div>
+
+            <!-- Estadísticas Principales -->
+            <div class="p-grid">
+                <div class="p-col-12 p-md-3">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background-color: #3B82F6;">
+                            <i class="pi pi-video"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>#{dashboardBean.statistics.totalTitles}</h3>
+                            <p>Títulos Totales</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-col-12 p-md-3">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background-color: #10B981;">
+                            <i class="pi pi-film"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>#{dashboardBean.statistics.totalMovies}</h3>
+                            <p>Películas</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-col-12 p-md-3">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background-color: #F59E0B;">
+                            <i class="pi pi-play"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>#{dashboardBean.statistics.totalSeries}</h3>
+                            <p>Series</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-col-12 p-md-3">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background-color: #8B5CF6;">
+                            <i class="pi pi-tags"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>#{dashboardBean.statistics.totalGenres}</h3>
+                            <p>Géneros</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estadísticas Secundarias -->
+            <div class="p-grid" style="margin-top: 20px;">
+                <div class="p-col-12 p-md-4">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background-color: #EC4899;">
+                            <i class="pi pi-image"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>#{dashboardBean.statistics.titlesWithPoster}</h3>
+                            <p>Títulos con Póster</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-col-12 p-md-4">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background-color: #14B8A6;">
+                            <i class="pi pi-calendar"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>#{dashboardBean.statistics.titlesLastMonth}</h3>
+                            <p>Registrados Último Mes</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-col-12 p-md-4">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background-color: #6366F1;">
+                            <i class="pi pi-file"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>#{dashboardBean.statistics.totalFiles}</h3>
+                            <p>Archivos en Azure Blob</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Almacenamiento -->
+            <div class="p-grid" style="margin-top: 20px;">
+                <div class="p-col-12">
+                    <p:panel header="Almacenamiento en Azure Blob Storage">
+                        <div style="text-align: center; padding: 20px;">
+                            <h2 style="color: #3B82F6; margin: 0;">
+                                <h:outputText value="#{dashboardBean.statistics.totalStorageMB}">
+                                    <f:convertNumber pattern="#,##0.00"/>
+                                </h:outputText> MB
+                            </h2>
+                            <p style="color: #6B7280; margin-top: 5px;">Espacio total utilizado</p>
+                        </div>
+                    </p:panel>
+                </div>
+            </div>
+
+            <!-- Archivos por Tipo -->
+            <div class="p-grid" style="margin-top: 20px;">
+                <div class="p-col-12 p-md-6">
+                    <p:panel header="Archivos por Tipo">
+                        <p:dataTable value="#{dashboardBean.statistics.filesByType.entrySet().toArray()}"
+                                     var="entry"
+                                     emptyMessage="No hay datos disponibles">
+                            <p:column headerText="Tipo">
+                                <h:outputText value="#{entry.key}"/>
+                            </p:column>
+                            <p:column headerText="Cantidad">
+                                <p:badge value="#{entry.value}" severity="info"/>
+                            </p:column>
+                        </p:dataTable>
+                    </p:panel>
+                </div>
+
+                <div class="p-col-12 p-md-6">
+                    <p:panel header="Top Géneros Más Utilizados">
+                        <p:dataTable value="#{dashboardBean.statistics.topGenres.entrySet().toArray()}"
+                                     var="genre"
+                                     rows="5"
+                                     emptyMessage="No hay datos disponibles">
+                            <p:column headerText="Género">
+                                <h:outputText value="#{genre.key}"/>
+                            </p:column>
+                            <p:column headerText="Títulos">
+                                <p:badge value="#{genre.value}" severity="success"/>
+                            </p:column>
+                        </p:dataTable>
+                    </p:panel>
+                </div>
+            </div>
+
+            <!-- Botón para ir al catálogo -->
+            <div style="text-align: center; margin-top: 30px;">
+                <p:button value="Ver Catálogo Completo"
+                          outcome="catalogo"
+                          icon="pi pi-list"
+                          styleClass="p-button-lg"/>
+            </div>
+        </div>
+    </h:form>
+
+    <style>
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+        }
+
+        .stat-content h3 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: bold;
+            color: #1F2937;
+        }
+
+        .stat-content p {
+            margin: 5px 0 0 0;
+            font-size: 14px;
+            color: #6B7280;
+        }
+    </style>
+</h:body>
+</html>
