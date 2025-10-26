@@ -23,11 +23,11 @@ public class AzureBlobStorageService {
 
     private static final String CONNECTION_STRING = System.getProperty(
             "azure.storage.connection-string",
-            "DefaultEndpointsProtocol=https;AccountName=catalogospg;AccountKey=YOUR_KEY;EndpointSuffix=core.windows.net"
+            "DefaultEndpointsProtocol=https;AccountName=storageuspg;AccountKey=nfnIgK5nTnP1B1xs7X+g9nAUOSuDb6ToRgZoTjYm8YjNbCIAJnXMUwfd1l8CiVHVDfHNOmlMMWny+AStiv+mcQ==;EndpointSuffix=core.windows.net"
     );
 
     private static final String CONTAINER_NAME = System.getProperty(
-            "azure.storage.container-name", "catalogos"
+            "azure.storage.container-name", "storageuspg"
     );
 
     private BlobServiceClient blobServiceClient;
