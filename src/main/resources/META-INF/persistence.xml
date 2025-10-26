@@ -1,9 +1,32 @@
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <persistence xmlns="https://jakarta.ee/xml/ns/persistence"
              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence https://jakarta.ee/xml/ns/persistence/persistence_3_2.xsd"
-             version="3.2">
-    <persistence-unit name="default">
+             xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence
+             https://jakarta.ee/xml/ns/persistence/persistence_3_0.xsd"
+             version="3.0">
 
+    <persistence-unit name="CatalogoMultimediaPU" transaction-type="JTA">
+        <jta-data-source>java:jboss/datasources/CatalogoMultimediaDS</jta-data-source>
+
+        <!-- Entidades -->
+        <class>com.catalogomultimedia.entity.MediaTitle</class>
+        <class>com.catalogomultimedia.entity.MovieGenre</class>
+        <class>com.catalogomultimedia.entity.MediaFile</class>
+
+        <properties>
+            <!-- Configuración de Hibernate -->
+            <property name="hibernate.dialect" value="org.hibernate.dialect.MySQLDialect"/>
+            <property name="hibernate.hbm2ddl.auto" value="update"/>
+            <property name="hibernate.show_sql" value="true"/>
+            <property name="hibernate.format_sql" value="true"/>
+
+            <!-- Configuración de transacciones -->
+            <property name="hibernate.transaction.jta.platform"
+                      value="org.hibernate.engine.transaction.jta.platform.internal.JBossAppServerJtaPlatform"/>
+
+            <!-- Caché de segundo nivel (opcional) -->
+            <property name="hibernate.cache.use_second_level_cache" value="false"/>
+            <property name="hibernate.cache.use_query_cache" value="false"/>
+        </properties>
     </persistence-unit>
 </persistence>

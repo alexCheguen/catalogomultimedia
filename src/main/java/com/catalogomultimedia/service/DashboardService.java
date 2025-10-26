@@ -1,61 +1,45 @@
 package com.catalogomultimedia.service;
 
-import com.catalogomultimedia.repository.MediaFileRepository;
-import com.catalogomultimedia.repository.MediaTitleRepository;
-import com.catalogomultimedia.repository.MovieGenreRepository;
-import lombok.Data;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
+import jakarta.ejb.EJB;
+import jakarta.ejb.Stateless;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@Service
+@Stateless
 public class DashboardService {
 
-    @Autowired
-    private MediaTitleRepository mediaTitleRepository;
+    @EJB
+    private MediaTitleService mediaTitleService;
 
-    @Autowired
-    private MovieGenreRepository movieGenreRepository;
+    @EJB
+    private MovieGenreService movieGenreService;
 
-    @Autowired
-    private MediaFileRepository mediaFileRepository;
+    @EJB
+    private MediaFileService mediaFileService;
 
-    /**
-     * Obtiene todas las estadísticas del dashboard
-     */
     public DashboardStatistics getDashboardStatistics() {
         DashboardStatistics stats = new DashboardStatistics();
 
-        // Consultas JPQL
-        stats.setTotalTitles(mediaTitleRepository.countTotalTitles());
-        stats.setTotalMovies(mediaTitleRepository.countMovies());
-        stats.setTotalSeries(mediaTitleRepository.countSeries());
-        stats.setTotalGenres(movieGenreRepository.countTotalGenres());
-        stats.setTotalFiles(mediaFileRepository.countTotalFiles());
-        stats.setTitlesWithPoster(mediaTitleRepository.countTitlesWithPoster());
+        stats.setTotalTitles(mediaTitleService.countTotalTitles());
+        stats.setTotalMovies(mediaTitleService.countMovies());
+        stats.setTotalSeries(mediaTitleService.countSeries());
+        stats.setTotalGenres(movieGenreService.countTotalGenres());
+        stats.setTotalFiles(mediaFileService.countTotalFiles());
+        stats.setTitlesWithPoster(mediaTitleService.countTitlesWithPoster());
+        stats.setTitlesLastMonth(mediaTitleService.countTitlesFromLastMonth());
 
-        // Títulos del último mes
-        LocalDateTime oneMonthAgo = LocalDateTime.now().minusMonths(1);
-        stats.setTitlesLastMonth(mediaTitleRepository.countTitlesFromLastMonth(oneMonthAgo));
-
-        // Archivos por tipo
-        List<Object[]> filesByType = mediaFileRepository.countFilesByType();
+        List<Object[]> filesByType = mediaFileService.countFilesByType();
         Map<String, Long> fileTypeMap = new HashMap<>();
         for (Object[] row : filesByType) {
             fileTypeMap.put(row[0].toString(), (Long) row[1]);
         }
         stats.setFilesByType(fileTypeMap);
 
-        // Tamaño total de almacenamiento
-        Long totalSize = mediaFileRepository.calculateTotalStorageSize();
-        stats.setTotalStorageMB(totalSize != null ? totalSize / (1024.0 * 1024.0) : 0.0);
+        Long totalSize = mediaFileService.calculateTotalStorageSize();
+        stats.setTotalStorageMB(totalSize / (1024.0 * 1024.0));
 
-        // Géneros más utilizados
-        List<Object[]> topGenres = movieGenreRepository.findMostUsedGenres();
+        List<Object[]> topGenres = movieGenreService.findMostUsedGenres();
         Map<String, Long> genreMap = new HashMap<>();
         for (Object[] row : topGenres) {
             genreMap.put((String) row[0], (Long) row[1]);
@@ -65,10 +49,6 @@ public class DashboardService {
         return stats;
     }
 
-    /**
-     * Clase DTO para las estadísticas del dashboard
-     */
-    @Data
     public static class DashboardStatistics {
         private Long totalTitles;
         private Long totalMovies;
@@ -80,5 +60,36 @@ public class DashboardService {
         private Double totalStorageMB;
         private Map<String, Long> filesByType;
         private Map<String, Long> topGenres;
+
+        // Getters y Setters
+        public Long getTotalTitles() { return totalTitles; }
+        public void setTotalTitles(Long totalTitles) { this.totalTitles = totalTitles; }
+
+        public Long getTotalMovies() { return totalMovies; }
+        public void setTotalMovies(Long totalMovies) { this.totalMovies = totalMovies; }
+
+        public Long getTotalSeries() { return totalSeries; }
+        public void setTotalSeries(Long totalSeries) { this.totalSeries = totalSeries; }
+
+        public Long getTotalGenres() { return totalGenres; }
+        public void setTotalGenres(Long totalGenres) { this.totalGenres = totalGenres; }
+
+        public Long getTotalFiles() { return totalFiles; }
+        public void setTotalFiles(Long totalFiles) { this.totalFiles = totalFiles; }
+
+        public Long getTitlesWithPoster() { return titlesWithPoster; }
+        public void setTitlesWithPoster(Long titlesWithPoster) { this.titlesWithPoster = titlesWithPoster; }
+
+        public Long getTitlesLastMonth() { return titlesLastMonth; }
+        public void setTitlesLastMonth(Long titlesLastMonth) { this.titlesLastMonth = titlesLastMonth; }
+
+        public Double getTotalStorageMB() { return totalStorageMB; }
+        public void setTotalStorageMB(Double totalStorageMB) { this.totalStorageMB = totalStorageMB; }
+
+        public Map<String, Long> getFilesByType() { return filesByType; }
+        public void setFilesByType(Map<String, Long> filesByType) { this.filesByType = filesByType; }
+
+        public Map<String, Long> getTopGenres() { return topGenres; }
+        public void setTopGenres(Map<String, Long> topGenres) { this.topGenres = topGenres; }
     }
 }

@@ -2,13 +2,14 @@ package com.catalogomultimedia.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
-import lombok.Data;
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "media_files")
-@Data
-public class MediaFile {
+public class MediaFile implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -53,8 +54,8 @@ public class MediaFile {
     }
 
     public enum FileType {
-        POSTER("Póster", new String[]{"image/jpeg", "image/png"}, 2 * 1024 * 1024L), // 2 MB
-        TECHNICAL_SHEET("Ficha Técnica", new String[]{"application/pdf"}, 5 * 1024 * 1024L); // 5 MB
+        POSTER("Póster", new String[]{"image/jpeg", "image/png"}, 2 * 1024 * 1024L),
+        TECHNICAL_SHEET("Ficha Técnica", new String[]{"application/pdf"}, 5 * 1024 * 1024L);
 
         private final String displayName;
         private final String[] allowedContentTypes;
@@ -66,24 +67,14 @@ public class MediaFile {
             this.maxSizeBytes = maxSizeBytes;
         }
 
-        public String getDisplayName() {
-            return displayName;
-        }
-
-        public String[] getAllowedContentTypes() {
-            return allowedContentTypes;
-        }
-
-        public Long getMaxSizeBytes() {
-            return maxSizeBytes;
-        }
+        public String getDisplayName() { return displayName; }
+        public String[] getAllowedContentTypes() { return allowedContentTypes; }
+        public Long getMaxSizeBytes() { return maxSizeBytes; }
 
         public boolean isValidContentType(String contentType) {
             if (contentType == null) return false;
             for (String allowed : allowedContentTypes) {
-                if (contentType.equalsIgnoreCase(allowed)) {
-                    return true;
-                }
+                if (contentType.equalsIgnoreCase(allowed)) return true;
             }
             return false;
         }
@@ -92,4 +83,35 @@ public class MediaFile {
             return sizeBytes != null && sizeBytes <= maxSizeBytes;
         }
     }
+
+    // Getters y Setters
+    public Long getMediaFileId() { return mediaFileId; }
+    public void setMediaFileId(Long mediaFileId) { this.mediaFileId = mediaFileId; }
+
+    public MediaTitle getMediaTitle() { return mediaTitle; }
+    public void setMediaTitle(MediaTitle mediaTitle) { this.mediaTitle = mediaTitle; }
+
+    public FileType getFileType() { return fileType; }
+    public void setFileType(FileType fileType) { this.fileType = fileType; }
+
+    public String getBlobUrl() { return blobUrl; }
+    public void setBlobUrl(String blobUrl) { this.blobUrl = blobUrl; }
+
+    public String getEtag() { return etag; }
+    public void setEtag(String etag) { this.etag = etag; }
+
+    public String getContentType() { return contentType; }
+    public void setContentType(String contentType) { this.contentType = contentType; }
+
+    public Long getSizeBytes() { return sizeBytes; }
+    public void setSizeBytes(Long sizeBytes) { this.sizeBytes = sizeBytes; }
+
+    public LocalDateTime getUploadedAt() { return uploadedAt; }
+    public void setUploadedAt(LocalDateTime uploadedAt) { this.uploadedAt = uploadedAt; }
+
+    public String getUploadedBy() { return uploadedBy; }
+    public void setUploadedBy(String uploadedBy) { this.uploadedBy = uploadedBy; }
+
+    public Boolean getIsActive() { return isActive; }
+    public void setIsActive(Boolean isActive) { this.isActive = isActive; }
 }

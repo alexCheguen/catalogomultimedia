@@ -3,19 +3,18 @@ package com.catalogomultimedia.bean;
 import com.catalogomultimedia.service.DashboardService;
 import com.catalogomultimedia.service.DashboardService.DashboardStatistics;
 import jakarta.annotation.PostConstruct;
+import jakarta.ejb.EJB;
 import jakarta.faces.view.ViewScoped;
-import lombok.Data;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-
+import jakarta.inject.Named;
 import java.io.Serializable;
 
-@Component("dashboardBean")
+@Named("dashboardBean")
 @ViewScoped
-@Data
 public class DashboardBean implements Serializable {
 
-    @Autowired
+    private static final long serialVersionUID = 1L;
+
+    @EJB
     private DashboardService dashboardService;
 
     private DashboardStatistics statistics;
@@ -31,5 +30,13 @@ public class DashboardBean implements Serializable {
 
     public void refresh() {
         loadStatistics();
+    }
+
+    public DashboardStatistics getStatistics() {
+        return statistics;
+    }
+
+    public void setStatistics(DashboardStatistics statistics) {
+        this.statistics = statistics;
     }
 }

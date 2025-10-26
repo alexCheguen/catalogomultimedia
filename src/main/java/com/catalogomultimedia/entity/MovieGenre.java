@@ -2,16 +2,15 @@ package com.catalogomultimedia.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.ToString;
+import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Set;
 
 @Entity
 @Table(name = "movie_genres")
-@Data
-public class MovieGenre {
+public class MovieGenre implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,8 +23,6 @@ public class MovieGenre {
     private String genreName;
 
     @ManyToMany(mappedBy = "genres")
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Set<MediaTitle> mediaTitles = new HashSet<>();
 
     public MovieGenre() {}
@@ -33,4 +30,14 @@ public class MovieGenre {
     public MovieGenre(String genreName) {
         this.genreName = genreName;
     }
+
+    // Getters y Setters
+    public Long getMovieGenreId() { return movieGenreId; }
+    public void setMovieGenreId(Long movieGenreId) { this.movieGenreId = movieGenreId; }
+
+    public String getGenreName() { return genreName; }
+    public void setGenreName(String genreName) { this.genreName = genreName; }
+
+    public Set<MediaTitle> getMediaTitles() { return mediaTitles; }
+    public void setMediaTitles(Set<MediaTitle> mediaTitles) { this.mediaTitles = mediaTitles; }
 }

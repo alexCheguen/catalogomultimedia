@@ -2,15 +2,16 @@ package com.catalogomultimedia.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
-import lombok.Data;
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
 @Entity
 @Table(name = "media_titles")
-@Data
-public class MediaTitle {
+public class MediaTitle implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,7 +46,7 @@ public class MediaTitle {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "media_title_genres",
             joinColumns = @JoinColumn(name = "media_title_id"),
@@ -76,18 +77,36 @@ public class MediaTitle {
         }
     }
 
-    public void addGenre(MovieGenre genre) {
-        genres.add(genre);
-        genre.getMediaTitles().add(this);
-    }
-
-    public void removeGenre(MovieGenre genre) {
-        genres.remove(genre);
-        genre.getMediaTitles().remove(this);
-    }
-
     public boolean hasPoster() {
         return mediaFiles.stream()
-                .anyMatch(file -> file.getFileType() == MediaFile.FileType.POSTER);
+                .anyMatch(file -> file.getFileType() == MediaFile.FileType.POSTER && file.getIsActive());
     }
+
+    // Getters y Setters
+    public Long getMediaTitleId() { return mediaTitleId; }
+    public void setMediaTitleId(Long mediaTitleId) { this.mediaTitleId = mediaTitleId; }
+
+    public String getTitleName() { return titleName; }
+    public void setTitleName(String titleName) { this.titleName = titleName; }
+
+    public TitleType getTitleType() { return titleType; }
+    public void setTitleType(TitleType titleType) { this.titleType = titleType; }
+
+    public Integer getReleaseYear() { return releaseYear; }
+    public void setReleaseYear(Integer releaseYear) { this.releaseYear = releaseYear; }
+
+    public String getSynopsis() { return synopsis; }
+    public void setSynopsis(String synopsis) { this.synopsis = synopsis; }
+
+    public Double getAverageRating() { return averageRating; }
+    public void setAverageRating(Double averageRating) { this.averageRating = averageRating; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Set<MovieGenre> getGenres() { return genres; }
+    public void setGenres(Set<MovieGenre> genres) { this.genres = genres; }
+
+    public Set<MediaFile> getMediaFiles() { return mediaFiles; }
+    public void setMediaFiles(Set<MediaFile> mediaFiles) { this.mediaFiles = mediaFiles; }
 }
