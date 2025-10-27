@@ -31,7 +31,7 @@
                             <i class="pi pi-video"></i>
                         </div>
                         <div class="stat-content">
-                            <h3>#{dashboardBean.statistics.totalTitles}</h3>
+                            <h3>#{dashboardBean.totalTitles}</h3>
                             <p>Títulos Totales</p>
                         </div>
                     </div>
@@ -43,7 +43,7 @@
                             <i class="pi pi-film"></i>
                         </div>
                         <div class="stat-content">
-                            <h3>#{dashboardBean.statistics.totalMovies}</h3>
+                            <h3>#{dashboardBean.totalMovies}</h3>
                             <p>Películas</p>
                         </div>
                     </div>
@@ -55,7 +55,7 @@
                             <i class="pi pi-play"></i>
                         </div>
                         <div class="stat-content">
-                            <h3>#{dashboardBean.statistics.totalSeries}</h3>
+                            <h3>#{dashboardBean.totalSeries}</h3>
                             <p>Series</p>
                         </div>
                     </div>
@@ -67,7 +67,7 @@
                             <i class="pi pi-tags"></i>
                         </div>
                         <div class="stat-content">
-                            <h3>#{dashboardBean.statistics.totalGenres}</h3>
+                            <h3>#{dashboardBean.totalGenres}</h3>
                             <p>Géneros</p>
                         </div>
                     </div>
@@ -82,7 +82,7 @@
                             <i class="pi pi-image"></i>
                         </div>
                         <div class="stat-content">
-                            <h3>#{dashboardBean.statistics.titlesWithPoster}</h3>
+                            <h3>#{dashboardBean.titlesWithPoster}</h3>
                             <p>Títulos con Póster</p>
                         </div>
                     </div>
@@ -94,7 +94,7 @@
                             <i class="pi pi-calendar"></i>
                         </div>
                         <div class="stat-content">
-                            <h3>#{dashboardBean.statistics.titlesLastMonth}</h3>
+                            <h3>#{dashboardBean.titlesLastMonth}</h3>
                             <p>Registrados Último Mes</p>
                         </div>
                     </div>
@@ -106,7 +106,7 @@
                             <i class="pi pi-file"></i>
                         </div>
                         <div class="stat-content">
-                            <h3>#{dashboardBean.statistics.totalFiles}</h3>
+                            <h3>#{dashboardBean.totalFiles}</h3>
                             <p>Archivos en Azure Blob</p>
                         </div>
                     </div>
@@ -119,7 +119,7 @@
                     <p:panel header="Almacenamiento en Azure Blob Storage">
                         <div style="text-align: center; padding: 20px;">
                             <h2 style="color: #3B82F6; margin: 0;">
-                                <h:outputText value="#{dashboardBean.statistics.totalStorageMB}">
+                                <h:outputText value="#{dashboardBean.totalStorageMB}">
                                     <f:convertNumber pattern="#,##0.00"/>
                                 </h:outputText> MB
                             </h2>
@@ -133,7 +133,7 @@
             <div class="p-grid" style="margin-top: 20px;">
                 <div class="p-col-12 p-md-6">
                     <p:panel header="Archivos por Tipo">
-                        <p:dataTable value="#{dashboardBean.statistics.filesByType.entrySet().toArray()}"
+                        <p:dataTable value="#{dashboardBean.filesByType.entrySet().toArray()}"
                                      var="entry"
                                      emptyMessage="No hay datos disponibles">
                             <p:column headerText="Tipo">
@@ -148,7 +148,7 @@
 
                 <div class="p-col-12 p-md-6">
                     <p:panel header="Top Géneros Más Utilizados">
-                        <p:dataTable value="#{dashboardBean.statistics.topGenres.entrySet().toArray()}"
+                        <p:dataTable value="#{dashboardBean.topGenres.entrySet().toArray()}"
                                      var="genre"
                                      rows="5"
                                      emptyMessage="No hay datos disponibles">
