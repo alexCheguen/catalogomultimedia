@@ -1,41 +1,50 @@
 package com.catalogomultimedia.service;
 
 import com.catalogomultimedia.entity.MediaTitle;
-import com.catalogomultimedia.entity.MovieGenre;
-import jakarta.ejb.Stateless;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.TypedQuery;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Stateless
+@ApplicationScoped
 public class MediaTitleService {
 
-    @PersistenceContext(unitName = "CatalogoMultimediaPU")
+    @Inject
     private EntityManager em;
 
-    public MediaTitle save(MediaTitle mediaTitle) {
-        // Validar año no sea futuro
-        int currentYear = LocalDateTime.now().getYear();
-        if (mediaTitle.getReleaseYear() != null && mediaTitle.getReleaseYear() > currentYear) {
-            throw new IllegalArgumentException("El año de lanzamiento no puede ser futuro");
-        }
+    public void guardar(MediaTitle mediaTitle) {
+        EntityTransaction tx = em.getTransaction();
+        try {
+            tx.begin();
 
-        // Validar al menos un género
-        if (mediaTitle.getGenres() == null || mediaTitle.getGenres().isEmpty()) {
-            throw new IllegalArgumentException("Debe asignar al menos un género");
-        }
+            int currentYear = LocalDateTime.now().getYear();
+            if (mediaTitle.getReleaseYear() != null && mediaTitle.getReleaseYear() > currentYear) {
+                throw new IllegalArgumentException("El año de lanzamiento no puede ser futuro");
+            }
 
-        if (mediaTitle.getMediaTitleId() == null) {
-            em.persist(mediaTitle);
-            return mediaTitle;
-        } else {
-            return em.merge(mediaTitle);
+            if (mediaTitle.getGenres() == null || mediaTitle.getGenres().isEmpty()) {
+                throw new IllegalArgumentException("Debe asignar al menos un género");
+            }
+
+            if (mediaTitle.getMediaTitleId() == null) {
+                em.persist(mediaTitle);
+            } else {
+                em.merge(mediaTitle);
+            }
+
+            tx.commit();
+        } catch (Exception e) {
+            if (tx.isActive()) {
+                tx.rollback();
+            }
+            throw new RuntimeException("Error al guardar título multimedia", e);
         }
     }
 
-    public MediaTitle findById(Long id) {
+    public MediaTitle buscarPorId(Long id) {
         MediaTitle title = em.find(MediaTitle.class, id);
         if (title == null) {
             throw new IllegalArgumentException("Título no encontrado");
@@ -44,17 +53,53 @@ public class MediaTitleService {
     }
 
     public List<MediaTitle> findAll() {
-        TypedQuery<MediaTitle> query = em.createQuery(
-                "SELECT mt FROM MediaTitle mt ORDER BY mt.createdAt DESC", MediaTitle.class);
-        return query.getResultList();
+        return em.createQuery(
+                        "SELECT mt FROM MediaTitle mt ORDER BY mt.createdAt DESC", MediaTitle.class)
+                .getResultList();
     }
 
-    public void delete(Long id) {
-        MediaTitle mediaTitle = findById(id);
-        em.remove(mediaTitle);
+    public void editar(MediaTitle mediaTitle) {
+        EntityTransaction tx = em.getTransaction();
+        try {
+            tx.begin();
+
+            // Verificar que el registro existe antes de actualizar
+            MediaTitle existente = em.find(MediaTitle.class, mediaTitle.getMediaTitleId());
+            if (existente == null) {
+                throw new RuntimeException("No se encontró el título multimedia con ID: " + mediaTitle.getMediaTitleId());
+            }
+
+            em.merge(mediaTitle);
+
+            tx.commit();
+        } catch (Exception e) {
+            if (tx.isActive()) {
+                tx.rollback();
+            }
+            throw new RuntimeException("Error al actualizar título multimedia", e);
+        }
     }
 
-    public List<MediaTitle> search(String titleName, MediaTitle.TitleType type,
+    public void eliminar(Long id) {
+        EntityTransaction tx = em.getTransaction();
+        try {
+            tx.begin();
+
+            MediaTitle mediaTitle = em.find(MediaTitle.class, id);
+            if (mediaTitle != null) {
+                em.remove(mediaTitle);
+            }
+
+            tx.commit();
+        } catch (Exception e) {
+            if (tx.isActive()) {
+                tx.rollback();
+            }
+            throw new RuntimeException("Error al eliminar título multimedia", e);
+        }
+    }
+
+    public List<MediaTitle> buscar(String titleName, MediaTitle.TitleType type,
                                    Integer year, Long genreId) {
         StringBuilder jpql = new StringBuilder("SELECT mt FROM MediaTitle mt ");
 
@@ -97,7 +142,7 @@ public class MediaTitleService {
         return query.getResultList();
     }
 
-    // Consultas JPQL para Dashboard
+    // Consultas para dashboard
     public Long countTotalTitles() {
         return em.createQuery("SELECT COUNT(mt) FROM MediaTitle mt", Long.class)
                 .getSingleResult();
@@ -123,11 +168,13 @@ public class MediaTitleService {
     }
 
     public Long countTitlesFromLastMonth() {
-        LocalDateTime oneMonthAgo = LocalDateTime.now().minusMonths(1);
+        LocalDateTime haceUnMes = LocalDateTime.now().minusMonths(1);
         return em.createQuery(
-                        "SELECT COUNT(mt) FROM MediaTitle mt WHERE mt.createdAt >= :dateFrom",
+                        "SELECT COUNT(mt) FROM MediaTitle mt WHERE mt.createdAt >= :fechaDesde",
                         Long.class)
-                .setParameter("dateFrom", oneMonthAgo)
+                .setParameter("fechaDesde", haceUnMes)
                 .getSingleResult();
     }
+
+
 }

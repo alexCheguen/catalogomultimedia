@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Entity
@@ -16,16 +18,16 @@ public class MediaTitle implements Serializable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "media_title_id")
-    private Long mediaTitleId;
+    private Long id;
 
-    @NotNull(message = "El nombre del título es obligatorio")
+    @NotBlank(message = "El nombre del título es obligatorio")
     @Size(min = 2, max = 150, message = "El nombre debe tener entre 2 y 150 caracteres")
-    @Column(name = "title_name", length = 150, nullable = false)
+    @Column(name = "title_name", nullable = false, length = 150)
     private String titleName;
 
     @NotNull(message = "El tipo de título es obligatorio")
     @Enumerated(EnumType.STRING)
-    @Column(name = "title_type", nullable = false)
+    @Column(name = "title_type", nullable = false, length = 20)
     private TitleType titleType;
 
     @NotNull(message = "El año de lanzamiento es obligatorio")
@@ -55,13 +57,9 @@ public class MediaTitle implements Serializable {
     private Set<MovieGenre> genres = new HashSet<>();
 
     @OneToMany(mappedBy = "mediaTitle", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<MediaFile> mediaFiles = new HashSet<>();
+    private List<MediaFile> mediaFiles = new ArrayList<>();
 
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-    }
-
+    // 🔹 Enumeración para tipos de título
     public enum TitleType {
         MOVIE("Película"),
         SERIES("Serie");
@@ -77,36 +75,162 @@ public class MediaTitle implements Serializable {
         }
     }
 
-    public boolean hasPoster() {
-        return mediaFiles.stream()
-                .anyMatch(file -> file.getFileType() == MediaFile.FileType.POSTER && file.getIsActive());
+    // 🔹 Constructores
+    public MediaTitle() {
     }
 
-    // Getters y Setters
-    public Long getMediaTitleId() { return mediaTitleId; }
-    public void setMediaTitleId(Long mediaTitleId) { this.mediaTitleId = mediaTitleId; }
+    public MediaTitle(String titleName, TitleType titleType, Integer releaseYear) {
+        this.titleName = titleName;
+        this.titleType = titleType;
+        this.releaseYear = releaseYear;
+    }
 
-    public String getTitleName() { return titleName; }
-    public void setTitleName(String titleName) { this.titleName = titleName; }
+    // 🔹 Lifecycle callback
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
 
-    public TitleType getTitleType() { return titleType; }
-    public void setTitleType(TitleType titleType) { this.titleType = titleType; }
+    // 🔹 Getters y Setters
+    public Long getMediaTitleId() {
+        return id;
+    }
 
-    public Integer getReleaseYear() { return releaseYear; }
-    public void setReleaseYear(Integer releaseYear) { this.releaseYear = releaseYear; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public String getSynopsis() { return synopsis; }
-    public void setSynopsis(String synopsis) { this.synopsis = synopsis; }
+    public String getTitleName() {
+        return titleName;
+    }
 
-    public Double getAverageRating() { return averageRating; }
-    public void setAverageRating(Double averageRating) { this.averageRating = averageRating; }
+    public void setTitleName(String titleName) {
+        this.titleName = titleName;
+    }
 
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public TitleType getTitleType() {
+        return titleType;
+    }
 
-    public Set<MovieGenre> getGenres() { return genres; }
-    public void setGenres(Set<MovieGenre> genres) { this.genres = genres; }
+    public void setTitleType(TitleType titleType) {
+        this.titleType = titleType;
+    }
 
-    public Set<MediaFile> getMediaFiles() { return mediaFiles; }
-    public void setMediaFiles(Set<MediaFile> mediaFiles) { this.mediaFiles = mediaFiles; }
+    public Integer getReleaseYear() {
+        return releaseYear;
+    }
+
+    public void setReleaseYear(Integer releaseYear) {
+        this.releaseYear = releaseYear;
+    }
+
+    public String getSynopsis() {
+        return synopsis;
+    }
+
+    public void setSynopsis(String synopsis) {
+        this.synopsis = synopsis;
+    }
+
+    public Double getAverageRating() {
+        return averageRating;
+    }
+
+    public void setAverageRating(Double averageRating) {
+        this.averageRating = averageRating;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public Set<MovieGenre> getGenres() {
+        return genres;
+    }
+
+    public void setGenres(Set<MovieGenre> genres) {
+        this.genres = genres;
+    }
+
+    public List<MediaFile> getMediaFiles() {
+        return mediaFiles;
+    }
+
+    public void setMediaFiles(List<MediaFile> mediaFiles) {
+        this.mediaFiles = mediaFiles;
+    }
+
+    // 🔹 Métodos utilitarios
+    public void addGenre(MovieGenre genre) {
+        this.genres.add(genre);
+    }
+
+    public void removeGenre(MovieGenre genre) {
+        this.genres.remove(genre);
+    }
+
+    public void addMediaFile(MediaFile mediaFile) {
+        this.mediaFiles.add(mediaFile);
+        mediaFile.setMediaTitle(this);
+    }
+
+    public void removeMediaFile(MediaFile mediaFile) {
+        this.mediaFiles.remove(mediaFile);
+        mediaFile.setMediaTitle(null);
+    }
+
+    public boolean hasPoster() {
+        return mediaFiles.stream()
+                .anyMatch(file -> file.getFileType() == MediaFile.FileType.POSTER
+                        && Boolean.TRUE.equals(file.getIsActive()));
+    }
+
+    public boolean hasTechnicalSheet() {
+        return mediaFiles.stream()
+                .anyMatch(file -> file.getFileType() == MediaFile.FileType.TECHNICAL_SHEET
+                        && Boolean.TRUE.equals(file.getIsActive()));
+    }
+
+    public MediaFile getActivePoster() {
+        return mediaFiles.stream()
+                .filter(file -> file.getFileType() == MediaFile.FileType.POSTER
+                        && Boolean.TRUE.equals(file.getIsActive()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    public String getGenresAsString() {
+        if (genres == null || genres.isEmpty()) {
+            return "Sin géneros";
+        }
+        return genres.stream()
+                .map(MovieGenre::getGenreName)
+                .reduce((a, b) -> a + ", " + b)
+                .orElse("");
+    }
+
+    public boolean isMovie() {
+        return TitleType.MOVIE.equals(titleType);
+    }
+
+    public boolean isSeries() {
+        return TitleType.SERIES.equals(titleType);
+    }
+
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder("MediaTitle{");
+        sb.append("id=").append(id);
+        sb.append(", titleName='").append(titleName).append('\'');
+        sb.append(", titleType=").append(titleType);
+        sb.append(", releaseYear=").append(releaseYear);
+        sb.append(", averageRating=").append(averageRating);
+        sb.append(", createdAt=").append(createdAt);
+        sb.append('}');
+        return sb.toString();
+    }
 }

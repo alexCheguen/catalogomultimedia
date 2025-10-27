@@ -1,54 +1,57 @@
 package com.catalogomultimedia.service;
 
-import jakarta.ejb.EJB;
-import jakarta.ejb.Stateless;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityTransaction;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@Stateless
+@ApplicationScoped
 public class DashboardService {
 
-    @EJB
+    @Inject
     private MediaTitleService mediaTitleService;
 
-    @EJB
+    @Inject
     private MovieGenreService movieGenreService;
 
-    @EJB
+    @Inject
     private MediaFileService mediaFileService;
 
+    @Inject
+    private EntityManager em;
+
     public DashboardStatistics getDashboardStatistics() {
-        DashboardStatistics stats = new DashboardStatistics();
+        EntityTransaction tx = em.getTransaction();
+        try {
+            tx.begin();
 
-        stats.setTotalTitles(mediaTitleService.countTotalTitles());
-        stats.setTotalMovies(mediaTitleService.countMovies());
-        stats.setTotalSeries(mediaTitleService.countSeries());
-        stats.setTotalGenres(movieGenreService.countTotalGenres());
-        stats.setTotalFiles(mediaFileService.countTotalFiles());
-        stats.setTitlesWithPoster(mediaTitleService.countTitlesWithPoster());
-        stats.setTitlesLastMonth(mediaTitleService.countTitlesFromLastMonth());
+            DashboardStatistics stats = new DashboardStatistics();
 
-        List<Object[]> filesByType = mediaFileService.countFilesByType();
-        Map<String, Long> fileTypeMap = new HashMap<>();
-        for (Object[] row : filesByType) {
-            fileTypeMap.put(row[0].toString(), (Long) row[1]);
+            stats.setTotalTitles(mediaTitleService.countTotalTitles());
+            stats.setTotalMovies(mediaTitleService.countMovies());
+            stats.setTotalSeries(mediaTitleService.countSeries());
+            stats.setTotalGenres(movieGenreService.countTotalGenres());
+            stats.setTotalFiles(mediaFileService.countTotalFiles());
+            stats.setTitlesWithPoster(mediaTitleService.countTitlesWithPoster());
+            stats.setTitlesLastMonth(mediaTitleService.countTitlesFromLastMonth());
+
+
+
+            tx.commit();
+            return stats;
+
+        } catch (Exception e) {
+            if (tx.isActive()) {
+                tx.rollback();
+            }
+            throw new RuntimeException("Error al obtener estadísticas del dashboard", e);
         }
-        stats.setFilesByType(fileTypeMap);
-
-        Long totalSize = mediaFileService.calculateTotalStorageSize();
-        stats.setTotalStorageMB(totalSize / (1024.0 * 1024.0));
-
-        List<Object[]> topGenres = movieGenreService.findMostUsedGenres();
-        Map<String, Long> genreMap = new HashMap<>();
-        for (Object[] row : topGenres) {
-            genreMap.put((String) row[0], (Long) row[1]);
-        }
-        stats.setTopGenres(genreMap);
-
-        return stats;
     }
 
+    // 📊 Clase interna que representa las estadísticas del panel
     public static class DashboardStatistics {
         private Long totalTitles;
         private Long totalMovies;

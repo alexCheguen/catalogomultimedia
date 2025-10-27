@@ -1,17 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.acheguen</groupId>
     <artifactId>catalogo-multimedia</artifactId>
     <version>1.0</version>
+    <name>Catálogo Multimedia</name>
     <packaging>war</packaging>
-
-    <name>Catalogo Multimedia</name>
-    <description>Sistema de catálogo multimedia con Azure Blob Storage para WildFly</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -20,8 +17,8 @@
         <maven.compiler.source>21</maven.compiler.source>
     </properties>
 
-    <dependencies>
 
+    <dependencies>
         <dependency>
             <groupId>jakarta.platform</groupId>
             <artifactId>jakarta.jakartaee-api</artifactId>
@@ -49,6 +46,12 @@
         </dependency>
 
         <dependency>
+            <groupId>org.primefaces</groupId>
+            <artifactId>primefaces-themes</artifactId>
+            <version>15.0.8</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.azure</groupId>
             <artifactId>azure-storage-blob</artifactId>
             <version>12.25.0</version>
@@ -60,6 +63,7 @@
             <version>1.18.30</version>
             <scope>provided</scope>
         </dependency>
+
         <dependency>
             <groupId>io.github.cdimascio</groupId>
             <artifactId>java-dotenv</artifactId>

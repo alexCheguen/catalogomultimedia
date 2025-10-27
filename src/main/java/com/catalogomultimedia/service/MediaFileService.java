@@ -2,28 +2,40 @@ package com.catalogomultimedia.service;
 
 import com.catalogomultimedia.entity.MediaFile;
 import com.catalogomultimedia.entity.MediaFile.FileType;
-import jakarta.ejb.Stateless;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.TypedQuery;
 import java.util.List;
 
-@Stateless
+@ApplicationScoped
 public class MediaFileService {
 
-    @PersistenceContext(unitName = "CatalogoMultimediaPU")
+    @Inject
     private EntityManager em;
 
-    public MediaFile save(MediaFile mediaFile) {
-        if (mediaFile.getMediaFileId() == null) {
-            em.persist(mediaFile);
-            return mediaFile;
-        } else {
-            return em.merge(mediaFile);
+    public void guardar(MediaFile mediaFile) {
+        EntityTransaction tx = em.getTransaction();
+        try {
+            tx.begin();
+
+            if (mediaFile.getMediaFileId() == null) {
+                em.persist(mediaFile);
+            } else {
+                em.merge(mediaFile);
+            }
+
+            tx.commit();
+        } catch (Exception e) {
+            if (tx.isActive()) {
+                tx.rollback();
+            }
+            throw new RuntimeException("Error al guardar archivo multimedia", e);
         }
     }
 
-    public MediaFile findById(Long id) {
+    public MediaFile buscarPorId(Long id) {
         MediaFile file = em.find(MediaFile.class, id);
         if (file == null) {
             throw new IllegalArgumentException("Archivo no encontrado");
@@ -31,7 +43,7 @@ public class MediaFileService {
         return file;
     }
 
-    public List<MediaFile> findByMediaTitleId(Long mediaTitleId) {
+    public List<MediaFile> buscarPorTituloId(Long mediaTitleId) {
         TypedQuery<MediaFile> query = em.createQuery(
                 "SELECT mf FROM MediaFile mf WHERE mf.mediaTitle.mediaTitleId = :titleId " +
                         "AND mf.isActive = true ORDER BY mf.uploadedAt DESC",
@@ -58,7 +70,7 @@ public class MediaFileService {
                 Long.class).getSingleResult();
     }
 
-    public List<Object[]> countFilesByType() {
+    public List<Object[]> contarArchivosPorTipo() {
         TypedQuery<Object[]> query = em.createQuery(
                 "SELECT mf.fileType, COUNT(mf) FROM MediaFile mf " +
                         "WHERE mf.isActive = true GROUP BY mf.fileType",
@@ -66,7 +78,7 @@ public class MediaFileService {
         return query.getResultList();
     }
 
-    public Long calculateTotalStorageSize() {
+    public Long calcularTamanoTotalAlmacenamiento() {
         Long result = em.createQuery(
                 "SELECT SUM(mf.sizeBytes) FROM MediaFile mf WHERE mf.isActive = true",
                 Long.class).getSingleResult();

@@ -3,40 +3,44 @@ package com.catalogomultimedia.bean;
 import com.catalogomultimedia.service.DashboardService;
 import com.catalogomultimedia.service.DashboardService.DashboardStatistics;
 import jakarta.annotation.PostConstruct;
-import jakarta.ejb.EJB;
 import jakarta.faces.view.ViewScoped;
+import jakarta.inject.Inject;
 import jakarta.inject.Named;
+
 import java.io.Serializable;
 
-@Named("dashboardBean")
+@Named
 @ViewScoped
 public class DashboardBean implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @EJB
+    @Inject
     private DashboardService dashboardService;
 
-    private DashboardStatistics statistics;
+    private DashboardStatistics estadisticas;
 
     @PostConstruct
     public void init() {
-        loadStatistics();
+        cargarEstadisticas();
     }
 
-    public void loadStatistics() {
-        statistics = dashboardService.getDashboardStatistics();
+    // 📊 Cargar estadísticas del dashboard
+    public void cargarEstadisticas() {
+        estadisticas = dashboardService.getDashboardStatistics();
     }
 
-    public void refresh() {
-        loadStatistics();
+    // 🔄 Refrescar estadísticas
+    public void refrescar() {
+        cargarEstadisticas();
     }
 
-    public DashboardStatistics getStatistics() {
-        return statistics;
+    // 🧭 Getters y Setters
+    public DashboardStatistics getEstadisticas() {
+        return estadisticas;
     }
 
-    public void setStatistics(DashboardStatistics statistics) {
-        this.statistics = statistics;
+    public void setEstadisticas(DashboardStatistics estadisticas) {
+        this.estadisticas = estadisticas;
     }
 }

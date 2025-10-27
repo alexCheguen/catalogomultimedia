@@ -3,88 +3,153 @@ package com.catalogomultimedia.bean;
 import com.catalogomultimedia.entity.MovieGenre;
 import com.catalogomultimedia.service.MovieGenreService;
 import jakarta.annotation.PostConstruct;
-import jakarta.ejb.EJB;
 import jakarta.faces.application.FacesMessage;
 import jakarta.faces.context.FacesContext;
 import jakarta.faces.view.ViewScoped;
+import jakarta.inject.Inject;
 import jakarta.inject.Named;
-import java.io.Serializable;
-import java.util.List;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 
-@Named("movieGenreBean")
+import java.io.Serializable;
+import java.util.*;
+
+@Named
 @ViewScoped
 public class MovieGenreBean implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @EJB
+    @Inject
     private MovieGenreService movieGenreService;
 
-    private List<MovieGenre> genres;
-    private MovieGenre selectedGenre;
-    private MovieGenre newGenre;
+    @Inject
+    private Validator validator;
+
+    private MovieGenre genero;
+    private List<MovieGenre> generos;
+    private boolean dialogVisible;
 
     @PostConstruct
     public void init() {
-        loadGenres();
-        newGenre = new MovieGenre();
+        genero = new MovieGenre();
+        dialogVisible = false;
+        cargarGeneros();
     }
 
-    public void loadGenres() {
-        genres = movieGenreService.findAll();
+    // 📦 Cargar lista de géneros
+    public void cargarGeneros() {
+        generos = movieGenreService.findAll();
     }
 
-    public void prepareNewGenre() {
-        newGenre = new MovieGenre();
+    // 🆕 Nuevo género
+    public void nuevo() {
+        clearFacesMessages();
+        genero = new MovieGenre();
+        dialogVisible = true;
     }
 
-    public void saveGenre() {
+    // ✏️ Editar género existente
+    public void editar(MovieGenre g) {
+        clearFacesMessages();
+        this.genero = g;
+        dialogVisible = true;
+    }
+
+    // 💾 Guardar género (crear o actualizar)
+    public void guardar() {
+        clearFacesMessages();
+
+        // Validar con Bean Validation
+        Set<ConstraintViolation<MovieGenre>> violations = validator.validate(genero);
+        if (!violations.isEmpty()) {
+            for (ConstraintViolation<MovieGenre> violation : violations) {
+                String field = violation.getPropertyPath().toString();
+                String message = violation.getMessage();
+                String label = getFieldLabel(field);
+
+                FacesContext.getCurrentInstance().addMessage("frmGenero",
+                        new FacesMessage(FacesMessage.SEVERITY_ERROR,
+                                label + ": " + message, null));
+            }
+            FacesContext.getCurrentInstance().validationFailed();
+            return;
+        }
+
         try {
-            movieGenreService.save(newGenre);
-            loadGenres();
-            addMessage(FacesMessage.SEVERITY_INFO, "Éxito", "Género guardado correctamente");
-            prepareNewGenre();
+            if (genero.getMovieGenreId() == null) {
+                movieGenreService.save(genero);
+                addMessage("Género creado exitosamente", FacesMessage.SEVERITY_INFO);
+            } else {
+                movieGenreService.save(genero);
+                addMessage("Género actualizado exitosamente", FacesMessage.SEVERITY_INFO);
+            }
+
+            genero = new MovieGenre();
+            dialogVisible = false;
+            cargarGeneros();
+
         } catch (Exception e) {
-            addMessage(FacesMessage.SEVERITY_ERROR, "Error", e.getMessage());
+            addMessage("Error al guardar género: " + e.getMessage(), FacesMessage.SEVERITY_ERROR);
         }
     }
 
-    public void prepareEdit(MovieGenre genre) {
-        selectedGenre = genre;
-    }
-
-    public void updateGenre() {
+    // 🗑️ Eliminar género
+    public void eliminar(MovieGenre g) {
         try {
-            movieGenreService.save(selectedGenre);
-            loadGenres();
-            addMessage(FacesMessage.SEVERITY_INFO, "Éxito", "Género actualizado correctamente");
+            movieGenreService.delete(g.getMovieGenreId());
+            addMessage("Género eliminado exitosamente", FacesMessage.SEVERITY_INFO);
+            cargarGeneros();
         } catch (Exception e) {
-            addMessage(FacesMessage.SEVERITY_ERROR, "Error", e.getMessage());
+            addMessage("Error al eliminar género: " + e.getMessage(), FacesMessage.SEVERITY_ERROR);
         }
     }
 
-    public void deleteGenre(Long id) {
-        try {
-            movieGenreService.delete(id);
-            loadGenres();
-            addMessage(FacesMessage.SEVERITY_INFO, "Éxito", "Género eliminado correctamente");
-        } catch (Exception e) {
-            addMessage(FacesMessage.SEVERITY_ERROR, "Error", e.getMessage());
+    // 🧹 Limpiar mensajes de FacesContext
+    private void clearFacesMessages() {
+        FacesContext ctx = FacesContext.getCurrentInstance();
+        if (ctx == null) return;
+        for (Iterator<FacesMessage> it = ctx.getMessages(); it.hasNext(); ) {
+            it.next();
+            it.remove();
         }
     }
 
-    private void addMessage(FacesMessage.Severity severity, String summary, String detail) {
+    // 📢 Agregar mensaje global
+    private void addMessage(String mensaje, FacesMessage.Severity severity) {
         FacesContext.getCurrentInstance().addMessage(null,
-                new FacesMessage(severity, summary, detail));
+                new FacesMessage(severity, mensaje, null));
     }
 
-    // Getters y Setters
-    public List<MovieGenre> getGenres() { return genres; }
-    public void setGenres(List<MovieGenre> genres) { this.genres = genres; }
+    // 🏷️ Etiquetas legibles para validaciones
+    private String getFieldLabel(String fieldName) {
+        Map<String, String> labels = new HashMap<>();
+        labels.put("genreName", "Nombre del género");
+        return labels.getOrDefault(fieldName, fieldName);
+    }
 
-    public MovieGenre getSelectedGenre() { return selectedGenre; }
-    public void setSelectedGenre(MovieGenre selectedGenre) { this.selectedGenre = selectedGenre; }
+    // 🧭 Getters y Setters
+    public MovieGenre getGenero() {
+        return genero;
+    }
 
-    public MovieGenre getNewGenre() { return newGenre; }
-    public void setNewGenre(MovieGenre newGenre) { this.newGenre = newGenre; }
+    public void setGenero(MovieGenre genero) {
+        this.genero = genero;
+    }
+
+    public List<MovieGenre> getGeneros() {
+        return generos;
+    }
+
+    public void setGeneros(List<MovieGenre> generos) {
+        this.generos = generos;
+    }
+
+    public boolean isDialogVisible() {
+        return dialogVisible;
+    }
+
+    public void setDialogVisible(boolean dialogVisible) {
+        this.dialogVisible = dialogVisible;
+    }
 }
