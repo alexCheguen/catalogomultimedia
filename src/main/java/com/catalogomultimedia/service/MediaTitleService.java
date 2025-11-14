@@ -15,7 +15,7 @@ public class MediaTitleService {
     @Inject
     private EntityManager em;
 
-    public void guardar(MediaTitle mediaTitle) {
+    public void save(MediaTitle mediaTitle) {
         EntityTransaction tx = em.getTransaction();
         try {
             tx.begin();
@@ -80,67 +80,17 @@ public class MediaTitleService {
         }
     }
 
-    public void eliminar(Long id) {
-        EntityTransaction tx = em.getTransaction();
-        try {
-            tx.begin();
+    public void delete(MediaTitle mediaTitle) {
 
-            MediaTitle mediaTitle = em.find(MediaTitle.class, id);
-            if (mediaTitle != null) {
-                em.remove(mediaTitle);
-            }
-
-            tx.commit();
-        } catch (Exception e) {
-            if (tx.isActive()) {
-                tx.rollback();
-            }
-            throw new RuntimeException("Error al eliminar título multimedia", e);
+        MediaTitle managed = em.find(MediaTitle.class, mediaTitle.getMediaTitleId());
+        if (managed != null) {
+            em.remove(managed);
+        } else {
+            throw new IllegalArgumentException("El registro no existe o ya fue eliminado.");
         }
     }
 
-    public List<MediaTitle> buscar(String titleName, MediaTitle.TitleType type,
-                                   Integer year, Long genreId) {
-        StringBuilder jpql = new StringBuilder("SELECT mt FROM MediaTitle mt ");
 
-        if (genreId != null) {
-            jpql.append("JOIN mt.genres g ");
-        }
-
-        jpql.append("WHERE 1=1 ");
-
-        if (titleName != null && !titleName.isEmpty()) {
-            jpql.append("AND LOWER(mt.titleName) LIKE LOWER(:titleName) ");
-        }
-        if (type != null) {
-            jpql.append("AND mt.titleType = :type ");
-        }
-        if (year != null) {
-            jpql.append("AND mt.releaseYear = :year ");
-        }
-        if (genreId != null) {
-            jpql.append("AND g.movieGenreId = :genreId ");
-        }
-
-        jpql.append("ORDER BY mt.createdAt DESC");
-
-        TypedQuery<MediaTitle> query = em.createQuery(jpql.toString(), MediaTitle.class);
-
-        if (titleName != null && !titleName.isEmpty()) {
-            query.setParameter("titleName", "%" + titleName + "%");
-        }
-        if (type != null) {
-            query.setParameter("type", type);
-        }
-        if (year != null) {
-            query.setParameter("year", year);
-        }
-        if (genreId != null) {
-            query.setParameter("genreId", genreId);
-        }
-
-        return query.getResultList();
-    }
 
     // Consultas para dashboard
     public Long countTotalTitles() {

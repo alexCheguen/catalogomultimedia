@@ -1,5 +1,6 @@
 package com.catalogomultimedia.entity;
 
+import com.catalogomultimedia.enums.TitleType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
@@ -59,21 +60,6 @@ public class MediaTitle implements Serializable {
     @OneToMany(mappedBy = "mediaTitle", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MediaFile> mediaFiles = new ArrayList<>();
 
-    // 🔹 Enumeración para tipos de título
-    public enum TitleType {
-        MOVIE("Película"),
-        SERIES("Serie");
-
-        private final String displayName;
-
-        TitleType(String displayName) {
-            this.displayName = displayName;
-        }
-
-        public String getDisplayName() {
-            return displayName;
-        }
-    }
 
     // 🔹 Constructores
     public MediaTitle() {
@@ -233,4 +219,5 @@ public class MediaTitle implements Serializable {
         sb.append('}');
         return sb.toString();
     }
+
 }

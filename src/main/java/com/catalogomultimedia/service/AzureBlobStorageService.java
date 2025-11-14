@@ -1,157 +1,291 @@
 package com.catalogomultimedia.service;
 
+
+import com.azure.core.http.rest.PagedIterable;
+import com.azure.core.util.BinaryData;
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.azure.storage.blob.models.BlobHttpHeaders;
+import com.azure.storage.blob.models.BlobItem;
 import com.azure.storage.blob.models.BlobProperties;
+import com.azure.storage.blob.options.BlockBlobSimpleUploadOptions;
 import com.azure.storage.blob.sas.BlobSasPermission;
 import com.azure.storage.blob.sas.BlobServiceSasSignatureValues;
-import com.catalogomultimedia.entity.MediaFile.FileType;
+import com.azure.storage.blob.specialized.BlockBlobClient;
+import com.azure.storage.common.sas.SasProtocol;
+import com.catalogomultimedia.dtos.MediaFileDTO;
+import com.catalogomultimedia.enums.FileType;
 import jakarta.annotation.PostConstruct;
-import jakarta.ejb.Singleton;
-import jakarta.ejb.Startup;
-import java.io.IOException;
+import jakarta.enterprise.context.ApplicationScoped;
+
 import java.io.InputStream;
+import java.time.Duration;
 import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.ZoneOffset;
+import java.util.*;
+import java.util.function.Supplier;
 
-@Singleton
-@Startup
+@ApplicationScoped
 public class AzureBlobStorageService {
-
-    private static final String CONNECTION_STRING = System.getProperty(
-            "azure.storage.connection-string",
-            "DefaultEndpointsProtocol=https;AccountName=storageuspg;AccountKey=nfnIgK5nTnP1B1xs7X+g9nAUOSuDb6ToRgZoTjYm8YjNbCIAJnXMUwfd1l8CiVHVDfHNOmlMMWny+AStiv+mcQ==;EndpointSuffix=core.windows.net"
-    );
-
-    private static final String CONTAINER_NAME = System.getProperty(
-            "azure.storage.container-name", "storageuspg"
-    );
-
     private BlobServiceClient blobServiceClient;
-    private BlobContainerClient containerClient;
+    private BlobContainerClient container;
+    private static final String CONTAINER_NAME = "catalogos";
 
-    @PostConstruct
-    public void init() {
-        blobServiceClient = new BlobServiceClientBuilder()
-                .connectionString(CONNECTION_STRING)
-                .buildClient();
+    public AzureBlobStorageService() {
 
-        containerClient = blobServiceClient.getBlobContainerClient(CONTAINER_NAME);
-
-        if (!containerClient.exists()) {
-            containerClient.create();
-        }
     }
 
-    public BlobUploadResult uploadFile(InputStream inputStream, long size,
-                                       String contentType, String titleName,
-                                       FileType fileType, String originalFilename)
-            throws IOException {
-
-        // Validar tipo de archivo
-        if (!fileType.isValidContentType(contentType)) {
-            throw new IllegalArgumentException(
-                    "Tipo de archivo no válido. Tipos permitidos: " +
-                            String.join(", ", fileType.getAllowedContentTypes())
-            );
+    @PostConstruct
+    void init() {
+        String conn = System.getProperty("AZURE_STORAGE_CONNECTION_STRING");
+        if (conn == null || conn.isBlank()) {
+            throw new IllegalStateException("AZURE_STORAGE_CONNECTION_STRING no está definida.");
         }
 
-        // Validar tamaño
-        if (!fileType.isValidSize(size)) {
-            throw new IllegalArgumentException(
-                    "El archivo excede el tamaño máximo permitido de " +
-                            (fileType.getMaxSizeBytes() / 1024 / 1024) + " MB"
-            );
+        blobServiceClient = new BlobServiceClientBuilder()
+                .connectionString(conn).buildClient();
+
+        container = blobServiceClient.getBlobContainerClient(CONTAINER_NAME);
+        if (!container.exists()) container.create();
+    }
+
+    /**
+     * Crea el contenedor si no existe
+     */
+    private BlobContainerClient ensureContainer(String name) {
+        BlobContainerClient client = blobServiceClient.getBlobContainerClient(name);
+        if (!client.exists()) client.create();
+        return client;
+    }
+
+    /**
+     * Sube un archivo al contenedor según la estructura:
+     * posters/{title_name}/{timestamp}.jpg o fichas/{title_name}/{timestamp}.pdf
+     */
+    public MediaFileDTO uploadCatalogFile(FileType fileType,
+                                          String titleName,
+                                          String originalFileName,
+                                          String contentType,
+                                          InputStream data,
+                                          long sizeBytes,
+                                          String uploadedBy,
+                                          Duration sasTtl,
+                                          boolean openInline) {
+
+
+        String safeTitle = slug(titleName);
+        String ext = guessExtension(originalFileName, contentType, fileType);
+
+        // Fallback de content-type si viene vacío
+        if (contentType == null || contentType.isBlank() || "application/octet-stream".equalsIgnoreCase(contentType)) {
+            contentType = switch (ext.toLowerCase(Locale.ROOT)) {
+                case "png" -> "image/png";
+                case "jpg", "jpeg" -> "image/jpeg";
+                case "pdf" -> "application/pdf";
+                default -> "application/octet-stream";
+            };
         }
 
-        String blobName = generateBlobName(titleName, fileType, originalFilename);
-        BlobClient blobClient = containerClient.getBlobClient(blobName);
+        String blobPath = buildPath(fileType, safeTitle, ext);
+        BlockBlobClient blob = container.getBlobClient(blobPath).getBlockBlobClient();
 
         BlobHttpHeaders headers = new BlobHttpHeaders().setContentType(contentType);
 
-        blobClient.upload(inputStream, size, true);
-        blobClient.setHttpHeaders(headers);
+        Map<String, String> metadata = new HashMap<>();
+        metadata.put("uploadedBy", uploadedBy != null ? uploadedBy : "unknown");
+        metadata.put("fileType", fileType.name());
+        metadata.put("titleName", safeTitle);
 
-        BlobProperties properties = blobClient.getProperties();
 
-        BlobUploadResult result = new BlobUploadResult();
-        result.setBlobUrl(blobClient.getBlobUrl());
-        result.setEtag(properties.getETag());
-        result.setContentType(contentType);
-        result.setSizeBytes(size);
-        result.setBlobName(blobName);
+        blob.uploadWithResponse(
+                new BlockBlobSimpleUploadOptions(BinaryData.fromStream(data, sizeBytes))
+                        .setHeaders(headers)
+                        .setMetadata(metadata),
+                null, null
+        );
 
+        BlobProperties props = blob.getProperties();
+
+
+        OffsetDateTime expiryTime = OffsetDateTime.now().plusDays(365);
+
+        BlobSasPermission sasPermission = new BlobSasPermission()
+                .setReadPermission(true);
+
+        BlobServiceSasSignatureValues sasSignatureValues = new BlobServiceSasSignatureValues(expiryTime, sasPermission)
+                .setStartTime(OffsetDateTime.now().minusMinutes(5));
+
+        String BlobSasUrl = this.buildBlobSasUrl(blob, Duration.ofDays(365), true, blob.getBlobName(), contentType);
+
+        // DTO
+        MediaFileDTO dto = new MediaFileDTO();
+        dto.setBlobName(blobPath);
+        dto.setPublicUrl(blob.getBlobUrl());
+        dto.setSignedUrl(BlobSasUrl);
+        dto.setEtag(props.getETag());
+        dto.setContentType(props.getContentType());
+        dto.setSizeBytes(props.getBlobSize());
+        dto.setFileType(fileType);
+        dto.setUploadedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        dto.setUploadedBy(uploadedBy);
+
+        return dto;
+    }
+
+    /**
+     * Obtiene un blob por su nombre
+     */
+    public Optional<MediaFileDTO> getBlob(String blobName) {
+        BlockBlobClient blob = container.getBlobClient(blobName).getBlockBlobClient();
+        if (!blob.exists()) return Optional.empty();
+
+        BlobProperties props = blob.getProperties();
+        MediaFileDTO dto = new MediaFileDTO();
+        dto.setBlobUrl(blob.getBlobUrl());
+        dto.setBlobName(blobName);
+        dto.setEtag(props.getETag());
+        dto.setContentType(props.getContentType());
+        dto.setSizeBytes(props.getBlobSize());
+        dto.setUploadedAt(props.getLastModified());
+        dto.setUploadedBy(getMeta(props.getMetadata(), "uploadedBy"));
+        dto.setFileType(fileTypeFromMetaOr(inferTypeByPath(blobName), props.getMetadata()));
+
+        return Optional.of(dto);
+    }
+
+    /**
+     * Lista todos los blobs o por prefijo
+     */
+    public List<MediaFileDTO> listBlobs(String prefix) {
+        List<MediaFileDTO> result = new ArrayList<>();
+        PagedIterable<BlobItem> items = (prefix == null || prefix.isEmpty())
+                ? container.listBlobs()
+                : container.listBlobsByHierarchy("/");
+
+        for (BlobItem item : items) {
+            String name = item.getName();
+            BlockBlobClient blob = container.getBlobClient(name).getBlockBlobClient();
+            BlobProperties props = safe(() -> blob.getProperties(), null);
+            if (props == null) continue;
+
+            MediaFileDTO dto = new MediaFileDTO();
+            dto.setBlobUrl(blob.getBlobUrl());
+            dto.setBlobName(name);
+            dto.setEtag(props.getETag());
+            dto.setContentType(props.getContentType());
+            dto.setSizeBytes(props.getBlobSize());
+            dto.setUploadedAt(props.getLastModified());
+            dto.setUploadedBy(getMeta(props.getMetadata(), "uploadedBy"));
+            dto.setFileType(fileTypeFromMetaOr(inferTypeByPath(name), props.getMetadata()));
+            result.add(dto);
+        }
         return result;
     }
 
-    public String generateSasUrl(String blobName, int expirationMinutes) {
-        BlobClient blobClient = containerClient.getBlobClient(blobName);
-
-        BlobSasPermission permission = new BlobSasPermission().setReadPermission(true);
-
-        BlobServiceSasSignatureValues values = new BlobServiceSasSignatureValues(
-                OffsetDateTime.now().plusMinutes(expirationMinutes),
-                permission
-        );
-
-        String sasToken = blobClient.generateSas(values);
-        return blobClient.getBlobUrl() + "?" + sasToken;
+    public List<MediaFileDTO> listAllBlobs() {
+        return listBlobs(null);
     }
 
+    /**
+     * Elimina físicamente un blob
+     */
     public boolean deleteBlob(String blobName) {
+        BlockBlobClient blob = container.getBlobClient(blobName).getBlockBlobClient();
+        if (!blob.exists()) return false;
+        blob.delete();
+        return true;
+    }
+
+    /**
+     * Genera una URL SAS de lectura temporal
+     */
+    public String generateBlobReadSasUrl(String blobName, Duration ttl) {
+        BlobClient blobClient = container.getBlobClient(blobName);
+        return this.buildBlobSasUrl(blobClient.getBlockBlobClient(), ttl, true, blobClient.getBlobName(), null);
+    }
+
+    /* -------------------- Helpers -------------------- */
+
+    private static <T> T safe(Supplier<T> sup, T def) {
         try {
-            BlobClient blobClient = containerClient.getBlobClient(blobName);
-            return blobClient.deleteIfExists();
+            return sup.get();
         } catch (Exception e) {
-            return false;
+            return def;
         }
     }
 
-    public String getContainerName() {
-        return CONTAINER_NAME;
+    private static String slug(String text) {
+        if (text == null) return "untitled";
+        return text.trim().toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "");
     }
 
-    private String generateBlobName(String titleName, FileType fileType, String originalFilename) {
-        String timestamp = OffsetDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-        String sanitizedTitle = titleName.replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
-        String extension = getFileExtension(originalFilename);
-
-        String folder = fileType == FileType.POSTER ? "posters" : "fichas";
-
-        return String.format("%s/%s/%s%s", folder, sanitizedTitle, timestamp, extension);
-    }
-
-    private String getFileExtension(String filename) {
-        if (filename == null || !filename.contains(".")) {
-            return "";
+    private static String guessExtension(String fileName, String contentType, FileType type) {
+        if (fileName != null && fileName.contains(".")) {
+            return fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
         }
-        return filename.substring(filename.lastIndexOf("."));
+        if ("application/pdf".equalsIgnoreCase(contentType)) return "pdf";
+        if ("image/png".equalsIgnoreCase(contentType)) return "png";
+        if ("image/jpeg".equalsIgnoreCase(contentType)) return "jpg";
+        return (type == FileType.TECHNICAL_SHEET) ? "pdf" : "jpg";
     }
 
-    public static class BlobUploadResult {
-        private String blobUrl;
-        private String etag;
-        private String contentType;
-        private Long sizeBytes;
-        private String blobName;
+    private static String buildPath(FileType type, String safeTitle, String ext) {
+        String folder = (type == FileType.POSTER) ? "posters" : "fichas";
+        long ts = System.currentTimeMillis();
+        return String.format("%s/%s/%d.%s", folder, safeTitle, ts, ext);
+    }
 
-        // Getters y Setters
-        public String getBlobUrl() { return blobUrl; }
-        public void setBlobUrl(String blobUrl) { this.blobUrl = blobUrl; }
+    private static String getMeta(Map<String, String> meta, String key) {
+        return (meta != null && meta.containsKey(key)) ? meta.get(key) : null;
+    }
 
-        public String getEtag() { return etag; }
-        public void setEtag(String etag) { this.etag = etag; }
+    private static FileType fileTypeFromMetaOr(FileType fallback, Map<String, String> meta) {
+        if (meta != null && meta.containsKey("fileType")) {
+            try {
+                return FileType.valueOf(meta.get("fileType"));
+            } catch (Exception ignored) {
+            }
+        }
+        return fallback;
+    }
 
-        public String getContentType() { return contentType; }
-        public void setContentType(String contentType) { this.contentType = contentType; }
+    private static FileType inferTypeByPath(String blobName) {
+        if (blobName.startsWith("posters/")) return FileType.POSTER;
+        if (blobName.startsWith("fichas/")) return FileType.TECHNICAL_SHEET;
+        return null;
+    }
 
-        public Long getSizeBytes() { return sizeBytes; }
-        public void setSizeBytes(Long sizeBytes) { this.sizeBytes = sizeBytes; }
+    private String buildBlobSasUrl(BlockBlobClient blob,
+                                   Duration ttl,
+                                   boolean openInline,
+                                   String downloadFileName,
+                                   String contentType) {
 
-        public String getBlobName() { return blobName; }
-        public void setBlobName(String blobName) { this.blobName = blobName; }
+        OffsetDateTime starts = OffsetDateTime.now().minusMinutes(5);
+        OffsetDateTime expires = OffsetDateTime.now().plus(ttl);
+
+        BlobSasPermission perm = new BlobSasPermission().setReadPermission(true);
+
+        BlobServiceSasSignatureValues sv = new BlobServiceSasSignatureValues(expires, perm)
+                .setStartTime(starts)
+                .setProtocol(SasProtocol.HTTPS_ONLY);
+
+        if (contentType != null && !contentType.isBlank()) {
+            sv.setContentType(contentType);
+        }
+
+        if (downloadFileName != null && !downloadFileName.isBlank()) {
+            String disp = openInline
+                    ? "inline; filename=\"" + downloadFileName + "\""
+                    : "attachment; filename=\"" + downloadFileName + "\"";
+            sv.setContentDisposition(disp);
+        }
+
+        String sasToken = blob.generateSas(sv);
+        return blob.getBlobUrl() + "?" + sasToken;
     }
 }

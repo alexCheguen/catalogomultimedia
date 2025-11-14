@@ -33,6 +33,9 @@ public class JpaProducer {
         props.put("hibernate.format_sql", System.getProperty("HIBERNATE_FORMAT_SQL"));
         props.put("hibernate.archive.autodetection", "class");
 
+
+        props.put("", System.getProperty("AZURE_STORAGE_STREAM"));
+
         // escanea el/los paquetes donde se encuetran los @Entity
         Set<Class<?>> entities = new Reflections("com.catalogomultimedia.entity")
                 .getTypesAnnotatedWith(Entity.class);

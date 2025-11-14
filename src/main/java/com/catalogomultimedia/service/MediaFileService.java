@@ -15,7 +15,20 @@ public class MediaFileService {
     @Inject
     private EntityManager em;
 
-    public void guardar(MediaFile mediaFile) {
+    public void delete(MediaFile mediaFile) {
+        if (mediaFile == null || mediaFile.getMediaFileId() == null) {
+            throw new IllegalArgumentException("Archivo no válido o sin ID.");
+        }
+
+        MediaFile managed = em.find(MediaFile.class, mediaFile.getMediaFileId());
+        if (managed != null) {
+            em.remove(managed);
+        } else {
+            throw new IllegalArgumentException("El archivo no existe o ya fue eliminado.");
+        }
+    }
+
+    public void save(MediaFile mediaFile) {
         EntityTransaction tx = em.getTransaction();
         try {
             tx.begin();
@@ -34,54 +47,17 @@ public class MediaFileService {
             throw new RuntimeException("Error al guardar archivo multimedia", e);
         }
     }
-
-    public MediaFile buscarPorId(Long id) {
-        MediaFile file = em.find(MediaFile.class, id);
-        if (file == null) {
-            throw new IllegalArgumentException("Archivo no encontrado");
-        }
-        return file;
-    }
-
-    public List<MediaFile> buscarPorTituloId(Long mediaTitleId) {
+    public List<MediaFile> findAll() {
         TypedQuery<MediaFile> query = em.createQuery(
-                "SELECT mf FROM MediaFile mf WHERE mf.mediaTitle.mediaTitleId = :titleId " +
-                        "AND mf.isActive = true ORDER BY mf.uploadedAt DESC",
-                MediaFile.class);
-        query.setParameter("titleId", mediaTitleId);
+                "SELECT mf FROM MediaFile mf WHERE mf.isActive = true",
+                MediaFile.class
+        );
         return query.getResultList();
-    }
-
-    public MediaFile findActivePosterByTitleId(Long mediaTitleId) {
-        TypedQuery<MediaFile> query = em.createQuery(
-                "SELECT mf FROM MediaFile mf WHERE mf.mediaTitle.mediaTitleId = :titleId " +
-                        "AND mf.fileType = :fileType AND mf.isActive = true",
-                MediaFile.class);
-        query.setParameter("titleId", mediaTitleId);
-        query.setParameter("fileType", FileType.POSTER);
-
-        List<MediaFile> results = query.getResultList();
-        return results.isEmpty() ? null : results.get(0);
     }
 
     public Long countTotalFiles() {
         return em.createQuery(
                 "SELECT COUNT(mf) FROM MediaFile mf WHERE mf.isActive = true",
                 Long.class).getSingleResult();
-    }
-
-    public List<Object[]> contarArchivosPorTipo() {
-        TypedQuery<Object[]> query = em.createQuery(
-                "SELECT mf.fileType, COUNT(mf) FROM MediaFile mf " +
-                        "WHERE mf.isActive = true GROUP BY mf.fileType",
-                Object[].class);
-        return query.getResultList();
-    }
-
-    public Long calcularTamanoTotalAlmacenamiento() {
-        Long result = em.createQuery(
-                "SELECT SUM(mf.sizeBytes) FROM MediaFile mf WHERE mf.isActive = true",
-                Long.class).getSingleResult();
-        return result != null ? result : 0L;
     }
 }

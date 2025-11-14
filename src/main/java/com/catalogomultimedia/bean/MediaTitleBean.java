@@ -1,335 +1,325 @@
 package com.catalogomultimedia.bean;
 
-import com.catalogomultimedia.entity.MediaFile;
-import com.catalogomultimedia.entity.MediaTitle;
+import com.catalogomultimedia.dtos.MediaFileDTO;
+import com.catalogomultimedia.enums.FileType;
+import com.catalogomultimedia.enums.TitleType;
 import com.catalogomultimedia.entity.MovieGenre;
 import com.catalogomultimedia.service.AzureBlobStorageService;
-import com.catalogomultimedia.service.MediaFileService;
-import com.catalogomultimedia.service.MediaTitleService;
-import com.catalogomultimedia.service.MovieGenreService;
 import jakarta.annotation.PostConstruct;
 import jakarta.faces.application.FacesMessage;
 import jakarta.faces.context.FacesContext;
 import jakarta.faces.view.ViewScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validator;
+import org.primefaces.PrimeFaces;
 import org.primefaces.event.FileUploadEvent;
 import org.primefaces.model.file.UploadedFile;
 
+import java.io.InputStream;
 import java.io.Serializable;
-import java.util.*;
+import java.time.Duration;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
-@Named
+
+
+import com.catalogomultimedia.entity.MediaFile;
+import com.catalogomultimedia.entity.MediaTitle;
+import com.catalogomultimedia.service.MediaFileService;
+import com.catalogomultimedia.service.MediaTitleService;
+import com.catalogomultimedia.service.MovieGenreService;
+
+
+
+
+
+
+@Named("mediaTitleBean")
 @ViewScoped
 public class MediaTitleBean implements Serializable {
 
-    private static final long serialVersionUID = 1L;
-
     @Inject
     private MediaTitleService mediaTitleService;
-
     @Inject
-    private MovieGenreService movieGenreService;
-
+    private MovieGenreService movieGenresService;
     @Inject
     private MediaFileService mediaFileService;
-
     @Inject
     private AzureBlobStorageService azureBlobStorageService;
 
-    @Inject
-    private Validator validator;
+    private MediaTitle selectedMediaTitle;
+    private MediaFile selectedMediaFile;
 
-    private MediaTitle titulo;
-    private List<MediaTitle> titulos;
-    private List<MediaTitle> titulosFiltrados;
-    private boolean dialogVisible;
-    private boolean dialogPosterVisible;
-    private boolean dialogFichaTecnicaVisible;
+    private FileType uploadingFileType = FileType.POSTER;
 
-    private List<MovieGenre> generosDisponibles;
-    private List<Long> generosSeleccionados;
 
-    private String buscarNombre;
-    private MediaTitle.TitleType buscarTipo;
-    private Integer buscarAnio;
-    private Long buscarGeneroId;
 
-    @PostConstruct
-    public void init() {
-        titulo = new MediaTitle();
-        dialogVisible = false;
-        dialogPosterVisible = false;
-        dialogFichaTecnicaVisible = false;
-        generosSeleccionados = new ArrayList<>();
-        cargarTitulos();
-        cargarGeneros();
-    }
 
-    public void cargarTitulos() {
-        titulos = mediaTitleService.findAll();
-    }
 
-    public void cargarGeneros() {
-        generosDisponibles = movieGenreService.findAll();
-    }
+    public List<MediaTitle> getMediaTitles() {return mediaTitleService.findAll();}
 
-    public void nuevo() {
-        clearFacesMessages();
-        titulo = new MediaTitle();
-        generosSeleccionados = new ArrayList<>();
-        dialogVisible = true;
-    }
+    public List<MovieGenre> getAllGenres() {return movieGenresService.findAll();}
 
-    public void editar(MediaTitle t) {
-        clearFacesMessages();
-        this.titulo = t;
-        generosSeleccionados = t.getGenres().stream()
-                .map(MovieGenre::getMovieGenreId) // Asegúrate que tu entidad tenga este getter
+    public TitleType[] getTitleTypes(){ return TitleType.values();}
+
+    public FileType[] getFileTypes(){ return FileType.values();}
+
+    public List<MediaFile> getMediaFilesOfSelected(){
+        if (selectedMediaTitle == null   || selectedMediaTitle.getMediaFiles() == null) return List.of();
+        return selectedMediaTitle.getMediaFiles().stream()
+                .sorted(Comparator.comparing(MediaFile::getUploadedAt).reversed())
                 .collect(Collectors.toList());
-        dialogVisible = true;
     }
 
-    public void guardar() {
-        clearFacesMessages();
 
-        // Validar con Bean Validation
-        Set<ConstraintViolation<MediaTitle>> violations = validator.validate(titulo);
-        if (!violations.isEmpty()) {
-            for (ConstraintViolation<MediaTitle> violation : violations) {
-                String field = violation.getPropertyPath().toString();
-                String message = violation.getMessage();
-                String label = getFieldLabel(field);
+    /*--Actions--*/
+    public void openNew(){selectedMediaTitle = new MediaTitle();}
 
-                FacesContext.getCurrentInstance().addMessage("frmTitulo",
-                        new FacesMessage(FacesMessage.SEVERITY_ERROR,
-                                label + ": " + message, null));
-            }
-            FacesContext.getCurrentInstance().validationFailed();
+    public void save(){
+        boolean isNew = selectedMediaTitle.getMediaTitleId()==null;
+        mediaTitleService.save(selectedMediaTitle);
+
+        FacesMessage msg = new FacesMessage(isNew ?
+                "Registro agregado con éxito!" : "Registro actualizado con éxito!");
+        FacesContext.getCurrentInstance().addMessage(null, msg);
+
+        PrimeFaces.current().executeScript("PD('manageMediaTitleDialog').hide()");
+        PrimeFaces.current().ajax().update("form-media-title-dialog:message-media-titles",
+                "form-media-title-dialogs:dt-media-titles");
+    }
+
+    public void delete() {
+        mediaTitleService.delete(selectedMediaTitle);
+        FacesContext.getCurrentInstance().addMessage(null, new FacesMessage("Registro eliminado con éxito!"));
+        PrimeFaces.current().ajax().update("form-media-title-dialogs:messages-media-titles",
+                "form-media-title-dialogs:dt-media-titles");
+    }
+
+    /*-- FileUpload / delete --*/
+    public void handleFileUpload(FileUploadEvent event){
+
+        UploadedFile uf = event.getFile();
+        if (uf == null || uf.getSize() == 0 ) return;
+
+        String ct = uf.getContentType();
+        long size = uf.getSize();
+        boolean isImage = "image/jpeg".equals(ct) || "image/png".equals(ct);
+        boolean isPdf = "application/pdf".equals(ct);
+
+        if (!(isImage || isPdf)) {
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "Tipo no permitido", ct));
+            return;
+        }
+        if (isImage && size > 2L * 1024 * 1024){
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "La imagen supera 2MB", uf.getFileName()));
+            return;
+        }
+        if (isPdf && size > 5L * 1024 * 1024){
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "El PDF supera 5MB", uf.getFileName()));
             return;
         }
 
-        if (generosSeleccionados == null || generosSeleccionados.isEmpty()) {
-            addMessage("Debe seleccionar al menos un género", FacesMessage.SEVERITY_ERROR);
-            return;
-        }
 
-        try {
-            Set<MovieGenre> generos = new HashSet<>();
-            for (Long genreId : generosSeleccionados) {
-                MovieGenre genero = movieGenreService.findById(genreId);
-                generos.add(genero);
-            }
-            titulo.setGenres(generos);
-
-            mediaTitleService.guardar(titulo);
-
-            addMessage(
-                    titulo.getMediaTitleId() == null ? "Título creado exitosamente" : "Título actualizado exitosamente",
-                    FacesMessage.SEVERITY_INFO
+        try (InputStream in = uf.getInputStream()) {
+            MediaFileDTO dto = azureBlobStorageService.uploadCatalogFile(
+                    uploadingFileType,
+                    selectedMediaTitle.getTitleName(),
+                    uf.getFileName(),
+                    uf.getContentType(),
+                    uf.getInputStream(),
+                    uf.getSize(),
+                    "ui",
+                    Duration.ofMinutes(30),
+                    true
             );
 
-            titulo = new MediaTitle();
-            generosSeleccionados = new ArrayList<>();
-            dialogVisible = false;
-            cargarTitulos();
-
-        } catch (Exception e) {
-            addMessage("Error al guardar título: " + e.getMessage(), FacesMessage.SEVERITY_ERROR);
-        }
-    }
-
-    public void eliminar(MediaTitle t) {
-        try {
-            mediaTitleService.eliminar(t.getMediaTitleId());
-            addMessage("Título eliminado exitosamente", FacesMessage.SEVERITY_INFO);
-            cargarTitulos();
-        } catch (Exception e) {
-            addMessage("Error al eliminar título: " + e.getMessage(), FacesMessage.SEVERITY_ERROR);
-        }
-    }
-
-    public void prepararSubidaPoster(MediaTitle t) {
-        clearFacesMessages();
-        this.titulo = t;
-        dialogPosterVisible = true;
-    }
-
-    public void prepararSubidaFichaTecnica(MediaTitle t) {
-        clearFacesMessages();
-        this.titulo = t;
-        dialogFichaTecnicaVisible = true;
-    }
-
-    public void subirPoster(FileUploadEvent event) {
-        try {
-            if (titulo == null || titulo.getMediaTitleId() == null) {
-                addMessage("Debe seleccionar un título primero", FacesMessage.SEVERITY_WARN);
-                return;
+            MediaFile mf = new MediaFile();
+            mf.setMediaTitle(selectedMediaTitle);
+            mf.setFileType(
+                    com.catalogomultimedia.entity.MediaFile.FileType.valueOf(dto.getFileType().name())
+            );
+            mf.setBlobUrl(dto.getSignedUrl());
+            mf.setEtag(dto.getEtag());
+            mf.setContentType(dto.getContentType());
+            mf.setSizeBytes(dto.getSizeBytes());
+            mf.setUploadedBy(dto.getUploadedBy());
+            selectedMediaTitle.getMediaFiles().add(mf);
+            if (dto.getUploadedAt() != null) {
+                mf.setUploadedAt(dto.getUploadedAt().toLocalDateTime());
+            } else {
+                mf.setUploadedAt(java.time.LocalDateTime.now());
             }
 
-            UploadedFile archivo = event.getFile();
+            selectedMediaTitle.getMediaFiles().add(mf);
 
-            MediaFile posterAntiguo = mediaFileService.findActivePosterByTitleId(
-                    titulo.getMediaTitleId());
-            if (posterAntiguo != null) {
-                posterAntiguo.setIsActive(false);
-                mediaFileService.guardar(posterAntiguo);
-            }
-
-            AzureBlobStorageService.BlobUploadResult resultado =
-                    azureBlobStorageService.uploadFile(
-                            archivo.getInputStream(),
-                            archivo.getSize(),
-                            archivo.getContentType(),
-                            titulo.getTitleName(),
-                            MediaFile.FileType.POSTER,
-                            archivo.getFileName()
-                    );
-
-            MediaFile archivoMedia = new MediaFile();
-            archivoMedia.setMediaTitle(titulo);
-            archivoMedia.setFileType(MediaFile.FileType.POSTER);
-            archivoMedia.setBlobUrl(resultado.getBlobUrl());
-            archivoMedia.setEtag(resultado.getEtag());
-            archivoMedia.setContentType(resultado.getContentType());
-            archivoMedia.setSizeBytes(resultado.getSizeBytes());
-            archivoMedia.setUploadedBy(obtenerUsuarioActual());
-
-            mediaFileService.guardar(archivoMedia);
-
-            cargarTitulos();
-            addMessage("Póster subido exitosamente", FacesMessage.SEVERITY_INFO);
-            dialogPosterVisible = false;
-
-        } catch (Exception e) {
-            addMessage("Error al subir póster: " + e.getMessage(), FacesMessage.SEVERITY_ERROR);
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage("Archivo cargado: " + uf.getFileName()));
+        } catch (Exception ex) {
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "Error al subir archivo", ex.getMessage()));
         }
+
+        PrimeFaces.current().ajax().update("form-media-title-dialogs:media-files-table",
+                "form-media-title-dialogs:msgsMediaTitles");
     }
 
-    public void subirFichaTecnica(FileUploadEvent event) {
-        try {
-            if (titulo == null || titulo.getMediaTitleId() == null) {
-                addMessage("Debe seleccionar un título primero", FacesMessage.SEVERITY_WARN);
-                return;
-            }
+    public void deleteMediaFile() {
+        if (selectedMediaFile == null) return;
 
-            UploadedFile archivo = event.getFile();
-
-            AzureBlobStorageService.BlobUploadResult resultado =
-                    azureBlobStorageService.uploadFile(
-                            archivo.getInputStream(),
-                            archivo.getSize(),
-                            archivo.getContentType(),
-                            titulo.getTitleName(),
-                            MediaFile.FileType.TECHNICAL_SHEET,
-                            archivo.getFileName()
-                    );
-
-            MediaFile archivoMedia = new MediaFile();
-            archivoMedia.setMediaTitle(titulo);
-            archivoMedia.setFileType(MediaFile.FileType.TECHNICAL_SHEET);
-            archivoMedia.setBlobUrl(resultado.getBlobUrl());
-            archivoMedia.setEtag(resultado.getEtag());
-            archivoMedia.setContentType(resultado.getContentType());
-            archivoMedia.setSizeBytes(resultado.getSizeBytes());
-            archivoMedia.setUploadedBy(obtenerUsuarioActual());
-
-            mediaFileService.guardar(archivoMedia);
-
-            addMessage("Ficha técnica subida exitosamente", FacesMessage.SEVERITY_INFO);
-            dialogFichaTecnicaVisible = false;
-
-        } catch (Exception e) {
-            addMessage("Error al subir ficha técnica: " + e.getMessage(), FacesMessage.SEVERITY_ERROR);
+        if (selectedMediaFile.getMediaFileId() != null) {
+            mediaFileService.delete(selectedMediaFile);
         }
+
+        // Actualizar la lista en el título seleccionado
+        List<MediaFile> files = mediaFileService.findAll(); // Si quieres refrescar desde BD
+        selectedMediaTitle.setMediaFiles(files.stream()
+                .filter(mf -> !mf.getBlobUrl().equals(selectedMediaFile.getBlobUrl()))
+                .collect(Collectors.toList()));
+
+        FacesContext.getCurrentInstance().addMessage(null, new FacesMessage("Archivo eliminado"));
+        PrimeFaces.current().ajax().update("form-media-title-dialogs:media-files-table",
+                "form-media-title-dialogs:msgsMediaTitles");
     }
 
-    public void buscar() {
-        titulos = mediaTitleService.buscar(buscarNombre, buscarTipo, buscarAnio, buscarGeneroId);
+    /* --------- Helpers --------- */
+    public String joinGenres(MediaTitle mt) {
+        if (mt == null || mt.getGenres() == null || mt.getGenres().isEmpty()) return "";
+        return mt.getGenres().stream()
+                .map(MovieGenre::getGenreName)
+                .sorted()
+                .collect(Collectors.joining(", "));
     }
 
-    public void limpiarBusqueda() {
-        buscarNombre = null;
-        buscarTipo = null;
-        buscarAnio = null;
-        buscarGeneroId = null;
-        cargarTitulos();
+    /* --------- Getters/Setters --------- */
+    public MediaTitle getSelectedMediaTitle() {
+        return selectedMediaTitle;
     }
 
-    public boolean tienePoster(MediaTitle t) {
-        return t != null && t.hasPoster();
+    public void setSelectedMediaTitle(MediaTitle selectedMediaTitle) {
+        this.selectedMediaTitle = selectedMediaTitle;
     }
 
-    private String obtenerUsuarioActual() {
-        return "admin";
+    public MediaFile getSelectedMediaFile() {
+        return selectedMediaFile;
     }
 
-    private void clearFacesMessages() {
-        FacesContext ctx = FacesContext.getCurrentInstance();
-        if (ctx == null) return;
-        for (Iterator<FacesMessage> it = ctx.getMessages(); it.hasNext(); ) {
-            it.next();
-            it.remove();
-        }
+    public void setSelectedMediaFile(MediaFile selectedMediaFile) {
+        this.selectedMediaFile = selectedMediaFile;
     }
 
-    private void addMessage(String mensaje, FacesMessage.Severity severity) {
-        FacesContext.getCurrentInstance().addMessage(null,
-                new FacesMessage(severity, mensaje, null));
+    public FileType getUploadingFileType() {
+        return uploadingFileType;
     }
 
-    private String getFieldLabel(String fieldName) {
-        Map<String, String> labels = new HashMap<>();
-        labels.put("titleName", "Nombre del título");
-        labels.put("titleType", "Tipo");
-        labels.put("releaseYear", "Año de lanzamiento");
-        labels.put("synopsis", "Sinopsis");
-        labels.put("averageRating", "Calificación");
-        return labels.getOrDefault(fieldName, fieldName);
+    public void setUploadingFileType(FileType uploadingFileType) {
+        this.uploadingFileType = uploadingFileType;
     }
 
-    public MediaTitle.TitleType[] getTiposTitulo() {
-        return MediaTitle.TitleType.values();
+    // Exponer listas/enums a la vista con nombres cómodos
+    public List<MovieGenre> getAllGenresWrapped() {
+        return getAllGenres();
     }
 
-    // Getters y Setters
-    public MediaTitle getTitulo() { return titulo; }
-    public void setTitulo(MediaTitle titulo) { this.titulo = titulo; }
+    public TitleType[] getTitleTypesWrapped() {
+        return getTitleTypes();
+    }
 
-    public List<MediaTitle> getTitulos() { return titulos; }
-    public void setTitulos(List<MediaTitle> titulos) { this.titulos = titulos; }
+    public FileType[] getFileTypesWrapped() {
+        return getFileTypes();
+    }
 
-    public List<MediaTitle> getTitulosFiltrados() { return titulosFiltrados; }
-    public void setTitulosFiltrados(List<MediaTitle> titulosFiltrados) { this.titulosFiltrados = titulosFiltrados; }
+    // ======= Propiedades de búsqueda =======
+    private String searchTitleName;
+    private TitleType searchType;
+    private Integer searchYear;
+    private Long searchGenreId;
 
-    public boolean isDialogVisible() { return dialogVisible; }
-    public void setDialogVisible(boolean dialogVisible) { this.dialogVisible = dialogVisible; }
+    private List<MovieGenre> availableGenres;
+    private List<MediaTitle> filteredTitles;
 
-    public boolean isDialogPosterVisible() { return dialogPosterVisible; }
-    public void setDialogPosterVisible(boolean dialogPosterVisible) { this.dialogPosterVisible = dialogPosterVisible; }
+    // ======= Métodos de búsqueda =======
+    @PostConstruct
+    public void init() {
+        selectedMediaTitle = new MediaTitle();
+        availableGenres = movieGenresService.findAll();
+    }
 
-    public boolean isDialogFichaTecnicaVisible() { return dialogFichaTecnicaVisible; }
-    public void setDialogFichaTecnicaVisible(boolean dialogFichaTecnicaVisible) { this.dialogFichaTecnicaVisible = dialogFichaTecnicaVisible; }
+    // Acción del botón "Buscar"
+    public void searchTitles() {
+        List<MediaTitle> all = mediaTitleService.findAll();
 
-    public List<MovieGenre> getGenerosDisponibles() { return generosDisponibles; }
-    public void setGenerosDisponibles(List<MovieGenre> generosDisponibles) { this.generosDisponibles = generosDisponibles; }
+        filteredTitles = all.stream()
+                .filter(t -> (searchTitleName == null || t.getTitleName().toLowerCase().contains(searchTitleName.toLowerCase())))
+                .filter(t -> (searchType == null || t.getTitleType() == searchType))
+                .filter(t -> (searchYear == null || (t.getReleaseYear() != null && t.getReleaseYear().equals(searchYear))))
+                .filter(t -> (searchGenreId == null ||
+                        (t.getGenres() != null && t.getGenres().stream()
+                                .anyMatch(g -> g.getMovieGenreId().equals(searchGenreId)))))
+                .collect(Collectors.toList());
+    }
 
-    public List<Long> getGenerosSeleccionados() { return generosSeleccionados; }
-    public void setGenerosSeleccionados(List<Long> generosSeleccionados) { this.generosSeleccionados = generosSeleccionados; }
+    // Acción del botón "Limpiar"
+    public void clearSearch() {
+        searchTitleName = null;
+        searchType = null;
+        searchYear = null;
+        searchGenreId = null;
+        filteredTitles = null;
+    }
 
-    public String getBuscarNombre() { return buscarNombre; }
-    public void setBuscarNombre(String buscarNombre) { this.buscarNombre = buscarNombre; }
+    // ======= Getters/Setters =======
+    public String getSearchTitleName() {
+        return searchTitleName;
+    }
 
-    public MediaTitle.TitleType getBuscarTipo() { return buscarTipo; }
-    public void setBuscarTipo(MediaTitle.TitleType buscarTipo) { this.buscarTipo = buscarTipo; }
+    public void setSearchTitleName(String searchTitleName) {
+        this.searchTitleName = searchTitleName;
+    }
 
-    public Integer getBuscarAnio() { return buscarAnio; }
-    public void setBuscarAnio(Integer buscarAnio) { this.buscarAnio = buscarAnio; }
+    public TitleType getSearchType() {
+        return searchType;
+    }
 
-    public Long getBuscarGeneroId() { return buscarGeneroId; }
-    public void setBuscarGeneroId(Long buscarGeneroId) { this.buscarGeneroId = buscarGeneroId; }
+    public void setSearchType(TitleType searchType) {
+        this.searchType = searchType;
+    }
+
+    public Integer getSearchYear() {
+        return searchYear;
+    }
+
+    public void setSearchYear(Integer searchYear) {
+        this.searchYear = searchYear;
+    }
+
+    public Long getSearchGenreId() {
+        return searchGenreId;
+    }
+
+    public void setSearchGenreId(Long searchGenreId) {
+        this.searchGenreId = searchGenreId;
+    }
+
+    public List<MovieGenre> getAvailableGenres() {
+        return availableGenres;
+    }
+
+    public void setAvailableGenres(List<MovieGenre> availableGenres) {
+        this.availableGenres = availableGenres;
+    }
+
+    public List<MediaTitle> getFilteredTitles() {
+        return filteredTitles;
+    }
+
+    public void setFilteredTitles(List<MediaTitle> filteredTitles) {
+        this.filteredTitles = filteredTitles;
+    }
+
 }
